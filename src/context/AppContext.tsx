@@ -60,8 +60,47 @@ interface AppState {
 
 const AppContext = createContext<AppState | null>(null);
 
+/** Erros do PostgREST chegam como objeto simples { message, code, details, hint }. */
+interface PgErrorShape {
+  message?: unknown;
+  code?: unknown;
+}
+
+function pgMessage(err: unknown): string | null {
+  if (!err || typeof err !== "object") return null;
+  const { message, code } = err as PgErrorShape;
+  const msg = typeof message === "string" ? message : "";
+  const c = typeof code === "string" ? code : "";
+
+  if (c === "PGRST204" || c === "42703" || /could not find the .* column/i.test(msg)) {
+    return "O banco de dados está desatualizado para esta versão do app. Execute os arquivos supabase/migration-002.sql e migration-003.sql no SQL Editor do Supabase e tente novamente.";
+  }
+  if (c === "42P01" || /does not exist/i.test(msg)) {
+    return "Tabela ausente no banco de dados. Execute supabase/schema.sql no SQL Editor do Supabase.";
+  }
+  if (/schema cache/i.test(msg)) {
+    return "O Supabase está recarregando o esquema. Aguarde alguns segundos e tente novamente.";
+  }
+  if (c === "42501") {
+    return "Permissão negada pelo banco. Saia da conta, entre novamente e tente salvar.";
+  }
+  if (c === "23514" || c === "23503" || /violates .* constraint|invalid input syntax/i.test(msg)) {
+    return "Dados inválidos para este lançamento. Verifique valor, parcelas e mês selecionado.";
+  }
+  if (c === "23505" || /duplicate key/i.test(msg)) {
+    return "Este lançamento já existe.";
+  }
+  if (c === "23502" || /null value/i.test(msg)) {
+    return "Faltam dados obrigatórios neste lançamento. Verifique descrição, valor e mês.";
+  }
+  return msg || null;
+}
+
 function messageOf(err: unknown): string {
-  if (err instanceof Error && err.message) return err.message;
+  const pg = pgMessage(err);
+  if (pg) return pg;
+  if (typeof err === "string" && err.trim()) return err;
+  if (err instanceof Error && err.message.trim()) return err.message;
   return "Ocorreu um erro inesperado. Tente novamente.";
 }
 
@@ -166,7 +205,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async (input: ExpenseInput) => {
       const supabase = getSupabase();
       if (!user) throw new Error("Sessão expirada. Faça login novamente.");
-      const row = toDbRow({ ...input, id: "" });
+      // user_id é obrigatório: a política RLS (auth.uid() = user_id) rejeita inserções sem ele.
+      const row = { ...toDbRow({ ...input, id: "" }), user_id: user.id };
       const { data, error: err } = await supabase.from("expenses").insert(row).select().single();
       if (err) throw new Error(messageOf(err));
       setExpenses((prev) => [...prev, toExpense(data)]);
@@ -210,8 +250,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         (e) => !existing.has(`${e.description.trim().toLowerCase()}::${e.category}`)
       );
       if (missing.length === 0) return 0;
-      const rows = missing.map((e) =>
-        toDbRow({
+      const rows = missing.map((e) => ({
+        ...toDbRow({
           id: "",
           description: e.description,
           category: e.category,
@@ -221,8 +261,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           installments: null,
           startMonth: null,
           referenceMonth: targetKey,
-        })
-      );
+        }),
+        user_id: user.id,
+      }));
       const { data, error: err } = await supabase.from("expenses").insert(rows).select();
       if (err) throw new Error(messageOf(err));
       setExpenses((prev) => [...prev, ...(data ?? []).map(toExpense)]);

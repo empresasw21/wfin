@@ -32,7 +32,7 @@ export default function DashboardScreen({
   monthKey: string;
   onMonthChange: (key: string) => void;
 }) {
-  const { expenses, dataLoading, setDialogMonth } = useApp();
+  const { expenses, dataLoading, error: dataError, setDialogMonth } = useApp();
 
   useEffect(() => {
     setDialogMonth(monthKey);
@@ -45,6 +45,14 @@ export default function DashboardScreen({
       <Header monthKey={monthKey} onMonthChange={onMonthChange} />
 
       <main className="mx-auto max-w-lg space-y-5 px-4 pt-4">
+        {dataError && (
+          <p
+            role="alert"
+            className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
+          >
+            {dataError}
+          </p>
+        )}
         {dataLoading ? (
           <div className="space-y-3" aria-busy>
             {[0, 1, 2].map((i) => (

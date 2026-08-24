@@ -18,6 +18,7 @@ export default function MonthView({
   const {
     expenses,
     dataLoading,
+    error: dataError,
     copyFromPreviousMonth,
     setDialogMonth,
   } = useApp();
@@ -48,12 +49,12 @@ export default function MonthView({
       <Header monthKey={monthKey} onMonthChange={onMonthChange} />
 
       <main className="mx-auto max-w-lg space-y-5 px-4 pt-4">
-        {actionError && (
+        {(actionError || dataError) && (
           <p
             role="alert"
             className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
           >
-            {actionError}
+            {actionError ?? dataError}
           </p>
         )}
 
