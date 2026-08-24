@@ -44,6 +44,7 @@ export function toCategory(row: any): Category {
     key: String(row.key),
     label: String(row.label),
     emoji: String(row.emoji ?? "📦"),
+    kind: row.kind === "income" ? "income" : "expense",
     sortOrder: Number(row.sort_order ?? 100),
     createdAt: row.created_at ? String(row.created_at) : undefined,
   };
@@ -57,6 +58,7 @@ export function categoryToDbRow(
     key: category.key,
     label: category.label,
     emoji: category.emoji,
+    kind: category.kind === "income" ? "income" : "expense",
     sort_order: category.sortOrder,
   };
 }

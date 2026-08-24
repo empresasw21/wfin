@@ -29,6 +29,8 @@ export interface Category {
   key: string;
   label: string;
   emoji: string;
+  /** Categorias são específicas por tipo de lançamento. */
+  kind: ExpenseKind;
   sortOrder: number;
   createdAt?: string;
 }
@@ -41,21 +43,39 @@ export interface CategoryDef {
   emoji: string;
 }
 
-/** Categorias semeadas automaticamente no primeiro acesso do usuário. */
-export const DEFAULT_CATEGORIES: Array<CategoryDef & { key: string }> = [
-  { id: "moradia", key: "moradia", label: "Moradia", emoji: "🏠" },
-  { id: "alimentacao", key: "alimentacao", label: "Alimentação", emoji: "🍽️" },
-  { id: "transporte", key: "transporte", label: "Transporte", emoji: "🚗" },
-  { id: "saude", key: "saude", label: "Saúde", emoji: "💊" },
-  { id: "educacao", key: "educacao", label: "Educação", emoji: "📚" },
-  { id: "lazer", key: "lazer", label: "Lazer", emoji: "🎮" },
-  { id: "assinaturas", key: "assinaturas", label: "Assinaturas", emoji: "🔁" },
-  { id: "outros", key: "outros", label: "Outros", emoji: "📦" },
+interface DefaultCategory extends CategoryDef {
+  key: string;
+  kind: ExpenseKind;
+}
+
+/** Categorias padrão de despesas, semeadas no primeiro acesso. */
+export const EXPENSE_DEFAULT_CATEGORIES: DefaultCategory[] = [
+  { id: "moradia", key: "moradia", label: "Moradia", emoji: "🏠", kind: "expense" },
+  { id: "alimentacao", key: "alimentacao", label: "Alimentação", emoji: "🍽️", kind: "expense" },
+  { id: "transporte", key: "transporte", label: "Transporte", emoji: "🚗", kind: "expense" },
+  { id: "saude", key: "saude", label: "Saúde", emoji: "💊", kind: "expense" },
+  { id: "educacao", key: "educacao", label: "Educação", emoji: "📚", kind: "expense" },
+  { id: "lazer", key: "lazer", label: "Lazer", emoji: "🎮", kind: "expense" },
+  { id: "assinaturas", key: "assinaturas", label: "Assinaturas", emoji: "🔁", kind: "expense" },
+  { id: "outros", key: "outros", label: "Outros", emoji: "📦", kind: "expense" },
 ];
 
-export const FALLBACK_CATEGORY: CategoryDef & { key: string } = {
-  id: "outros",
-  key: "outros",
-  label: "Outros",
-  emoji: "📦",
-};
+/** Categorias padrão de receitas, semeadas no primeiro acesso (e para usuários existentes). */
+export const INCOME_DEFAULT_CATEGORIES: DefaultCategory[] = [
+  { id: "salario", key: "salario", label: "Salário", emoji: "💼", kind: "income" },
+  { id: "investimentos", key: "investimentos", label: "Investimentos", emoji: "📈", kind: "income" },
+  { id: "vendas", key: "vendas", label: "Vendas", emoji: "🛍️", kind: "income" },
+  { id: "renda-extra", key: "renda-extra", label: "Renda extra", emoji: "💡", kind: "income" },
+  { id: "presentes", key: "presentes", label: "Presentes", emoji: "🎁", kind: "income" },
+  { id: "outros-receita", key: "outros-receita", label: "Outros", emoji: "💰", kind: "income" },
+];
+
+export function defaultCategoriesFor(kind: ExpenseKind): DefaultCategory[] {
+  return kind === "income" ? INCOME_DEFAULT_CATEGORIES : EXPENSE_DEFAULT_CATEGORIES;
+}
+
+export function fallbackCategoryFor(kind: ExpenseKind): CategoryDef & { key: string } {
+  return kind === "income"
+    ? { id: "outros-receita", key: "outros-receita", label: "Outros", emoji: "💰" }
+    : { id: "outros", key: "outros", label: "Outros", emoji: "📦" };
+}

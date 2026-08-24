@@ -1,11 +1,35 @@
-import { DEFAULT_CATEGORIES, FALLBACK_CATEGORY, type Category, type CategoryDef } from "./types";
+import {
+  defaultCategoriesFor,
+  fallbackCategoryFor,
+  type Category,
+  type CategoryDef,
+  type ExpenseKind,
+} from "./types";
 
-export function categoryOf(categories: Category[], key: string): CategoryDef {
-  const found = categories.find((c) => c.key === key);
-  if (found) return { id: found.key, label: found.label, emoji: found.emoji };
-  const legacy = DEFAULT_CATEGORIES.find((c) => c.key === key);
-  if (legacy) return { id: legacy.key, label: legacy.label, emoji: legacy.emoji };
-  return { id: FALLBACK_CATEGORY.key, label: FALLBACK_CATEGORY.label, emoji: FALLBACK_CATEGORY.emoji };
+/**
+ * Resolve a categoria exibida para uma chave.
+ * - Prefere correspondência exata de chave + tipo;
+ * - Chaves compartilhadas (ex.: personalizadas) são aceitas entre tipos;
+ * - Cai no padrão do próprio tipo e, por fim, no fallback ("Outros") do tipo.
+ */
+export function categoryOf(
+  categories: Category[],
+  key: string,
+  kind: ExpenseKind = "expense"
+): CategoryDef & { key: string } {
+  const exact = categories.find((c) => c.key === key && c.kind === kind);
+  if (exact) return { id: exact.key, key: exact.key, label: exact.label, emoji: exact.emoji };
+
+  const shared = categories.find((c) => c.key === key);
+  if (shared && key !== "outros" && key !== "outros-receita") {
+    return { id: shared.key, key: shared.key, label: shared.label, emoji: shared.emoji };
+  }
+
+  const legacy = defaultCategoriesFor(kind).find((c) => c.key === key);
+  if (legacy) return { id: legacy.key, key: legacy.key, label: legacy.label, emoji: legacy.emoji };
+
+  const fb = fallbackCategoryFor(kind);
+  return { id: fb.key, key: fb.key, label: fb.label, emoji: fb.emoji };
 }
 
 export function slugify(label: string): string {
@@ -26,12 +50,20 @@ export function uniqueKey(base: string, existingKeys: Set<string>): string {
   return `${base}-${n}`;
 }
 
-export function nextSortOrder(categories: Category[]): number {
-  return categories.reduce((max, c) => Math.max(max, c.sortOrder), 0) + 10;
+export function nextSortOrder(categories: Category[], kind: ExpenseKind): number {
+  return categories.reduce(
+    (max, c) => (c.kind === kind ? Math.max(max, c.sortOrder) : max),
+    0
+  ) + 10;
 }
 
 export const EMOJI_PRESETS = [
   "🏠", "🍽️", "🚗", "💊", "📚", "🎮", "🔁", "📦",
   "🛒", "✈️", "🐶", "💡", "💧", "📱", "👕", "🎁",
   "💰", "🏦", "⚽", "🎬", "🎓", "🧾", "🚿", "☕",
+];
+
+export const INCOME_EMOJI_PRESETS = [
+  "💼", "📈", "🛍️", "💡", "🎁", "💰", "🏦", "🏠",
+  "💻", "📊", "🎯", "🤝", "🪙", "💳", "📄", "✨",
 ];

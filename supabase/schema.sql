@@ -35,20 +35,25 @@ comment on table public.expenses is
   'Lançamentos do usuário. kind=''expense'' + type=''fixed'': valor mensal em reference_month. kind=''expense'' + type=''installment'': compra total (amount) em installments parcelas a partir de start_month. kind=''income'': receita mensal em reference_month.';
 
 -- ============================================================
--- Categorias personalizadas
+-- Categorias personalizadas (por tipo: despesa ou receita)
 -- ============================================================
 create table if not exists public.categories (
   user_id uuid not null references auth.users (id) on delete cascade,
   key text not null,
   label text not null check (char_length(label) between 1 and 30),
   emoji text not null default '📦',
+  kind text not null default 'expense' check (kind in ('expense', 'income')),
   sort_order int not null default 100,
   created_at timestamptz not null default now(),
   primary key (user_id, key)
 );
 
+alter table public.categories drop constraint if exists categories_kind_check;
+alter table public.categories add constraint categories_kind_check
+  check (kind in ('expense', 'income'));
+
 comment on table public.categories is
-  'Categorias do usuário. expenses.category referencia categories.key. As categorias padrão são semeadas automaticamente pelo app no primeiro acesso.';
+  'Categorias do usuário. expenses.category referencia categories.key. As categorias padrão de despesas e de receitas são semeadas automaticamente pelo app no primeiro acesso.';
 
 -- ============================================================
 -- Segurança: cada usuário só acessa os próprios dados.
@@ -112,3 +117,6 @@ create index if not exists expenses_user_kind_idx
 
 create index if not exists categories_user_sort_idx
   on public.categories (user_id, sort_order);
+
+create index if not exists categories_user_kind_idx
+  on public.categories (user_id, kind);

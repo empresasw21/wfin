@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { fmtBRL } from "@/lib/format";
 import { compareFixed } from "@/lib/calc";
 import { categoryOf } from "@/lib/categories";
@@ -33,7 +33,10 @@ function MonthlyEntriesSection({
   onCopyPrevious: () => void;
 }) {
   const { categories, openEditExpense } = useApp();
-  const lookup = (key: string) => categoryOf(categories, key);
+  const lookup = useCallback(
+    (key: string) => categoryOf(categories, key, kind),
+    [categories, kind]
+  );
   const { rows, absent } = compareFixed(expenses, monthKey, kind);
   const [showAbsent, setShowAbsent] = useState(false);
   const total = rows.reduce((acc, r) => acc + r.currentTotal, 0);

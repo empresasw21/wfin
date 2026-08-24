@@ -17,8 +17,8 @@ import { fixedForMonth } from "@/lib/calc";
 import { shiftMonth } from "@/lib/months";
 import { nextSortOrder, slugify, uniqueKey } from "@/lib/categories";
 import {
-  DEFAULT_CATEGORIES,
-  FALLBACK_CATEGORY,
+  defaultCategoriesFor,
+  fallbackCategoryFor,
   type Category,
   type CategoryInput,
   type Expense,
@@ -43,7 +43,7 @@ interface AppState {
   copyFromPreviousMonth: (targetKey: string, kind: ExpenseKind) => Promise<number>;
   addCategory: (input: Omit<CategoryInput, "key" | "sortOrder">) => Promise<void>;
   updateCategory: (key: string, input: Pick<CategoryInput, "label" | "emoji">) => Promise<void>;
-  deleteCategory: (key: string) => Promise<void>;
+  deleteCategory: (key: string, kind: ExpenseKind) => Promise<void>;
   signOut: () => Promise<void>;
   // Diálogos globais
   dialogMonth: string;
@@ -129,24 +129,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .then(async ({ data, error: err }) => {
         if (err) return;
         let list = (data ?? []).map(toCategory);
-        if (list.length === 0 && seededRef.current !== user.id) {
+        // Seed idempotente: garante os padrões de cada tipo que estiver faltando
+        // (usuários novos recebem tudo; quem já usava recebe só as de receita).
+        const missingKinds = (["expense", "income"] as const).filter(
+          (k) => !list.some((c) => c.kind === k)
+        );
+        if (missingKinds.length > 0 && seededRef.current !== user.id) {
           seededRef.current = user.id;
-          const rows = DEFAULT_CATEGORIES.map((c, i) =>
-            categoryToDbRow({
-              userId: user.id,
-              key: c.key,
-              label: c.label,
-              emoji: c.emoji,
-              sortOrder: (i + 1) * 10,
-            })
+          const rows = missingKinds.flatMap((kind) =>
+            defaultCategoriesFor(kind)
+              .filter((c) => !list.some((existing) => existing.key === c.key))
+              .map((c, i) =>
+                categoryToDbRow({
+                  userId: user.id,
+                  key: c.key,
+                  label: c.label,
+                  emoji: c.emoji,
+                  kind,
+                  sortOrder: (kind === "expense" ? 10 : 100) + i * 10,
+                })
+              )
           );
-          const { data: inserted, error: insertErr } = await supabase
-            .from("categories")
-            .insert(rows)
-            .select();
-          if (!insertErr && inserted) list = inserted.map(toCategory);
+          if (rows.length > 0) {
+            const { data: inserted, error: insertErr } = await supabase
+              .from("categories")
+              .insert(rows)
+              .select();
+            if (!insertErr && inserted) list = [...list, ...inserted.map(toCategory)];
+          }
         }
-        if (seededRef.current === user.id || list.length > 0) setCategories(list);
+        setCategories(list);
       });
   }, [user]);
 
@@ -225,14 +237,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!user) throw new Error("Sessão expirada. Faça login novamente.");
       const label = input.label.trim();
       if (!label) throw new Error("Informe um nome para a categoria.");
+      const kind: ExpenseKind = input.kind === "income" ? "income" : "expense";
       const keys = new Set(categories.map((c) => c.key));
       const key = uniqueKey(slugify(label), keys);
       const row = categoryToDbRow({
         userId: user.id,
         key,
         label,
-        emoji: input.emoji || FALLBACK_CATEGORY.emoji,
-        sortOrder: nextSortOrder(categories),
+        emoji: input.emoji || fallbackCategoryFor(kind).emoji,
+        kind,
+        sortOrder: nextSortOrder(categories, kind),
       });
       const { data, error: err } = await supabase.from("categories").insert(row).select().single();
       if (err) throw new Error(messageOf(err));
@@ -248,31 +262,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!label) throw new Error("Informe um nome para a categoria.");
       const { error: err } = await supabase
         .from("categories")
-        .update({ label, emoji: input.emoji || FALLBACK_CATEGORY.emoji })
+        .update({ label, emoji: input.emoji })
         .eq("key", key);
       if (err) throw new Error(messageOf(err));
       setCategories((prev) =>
-        prev.map((c) =>
-          c.key === key ? { ...c, label, emoji: input.emoji || FALLBACK_CATEGORY.emoji } : c
-        )
+        prev.map((c) => (c.key === key ? { ...c, label, emoji: input.emoji } : c))
       );
     },
     []
   );
 
   const deleteCategory = useCallback(
-    async (key: string) => {
+    async (key: string, kind: ExpenseKind) => {
       const supabase = getSupabase();
-      if (key === FALLBACK_CATEGORY.key) {
+      const fallbackKey = fallbackCategoryFor(kind).key;
+      if (key === fallbackKey || key.startsWith("outros")) {
         throw new Error('A categoria "Outros" não pode ser excluída.');
       }
+      // Reatribui apenas os lançamentos do mesmo tipo.
       const { error: updErr } = await supabase
         .from("expenses")
-        .update({ category: FALLBACK_CATEGORY.key })
-        .eq("category", key);
+        .update({ category: fallbackKey })
+        .eq("category", key)
+        .eq("kind", kind);
       if (updErr) throw new Error(messageOf(updErr));
       setExpenses((prev) =>
-        prev.map((e) => (e.category === key ? { ...e, category: FALLBACK_CATEGORY.key } : e))
+        prev.map((e) =>
+          e.category === key && e.kind === kind ? { ...e, category: fallbackKey } : e
+        )
       );
       const { error: err } = await supabase.from("categories").delete().eq("key", key);
       if (err) throw new Error(messageOf(err));

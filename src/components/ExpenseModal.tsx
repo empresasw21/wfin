@@ -3,11 +3,26 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { fmtBRL, parseAmount } from "@/lib/format";
 import { currentMonthKey, monthLabel } from "@/lib/months";
+import { fallbackCategoryFor } from "@/lib/types";
 import { useApp } from "@/context/AppContext";
 import type { ExpenseInput, ExpenseKind, ExpenseType } from "@/lib/types";
 import { CloseIcon, TagsIcon, TrashIcon } from "./icons";
 
 const QUICK_INSTALLMENTS = [2, 3, 6, 10, 12, 24];
+
+/** Categoria pré-selecionada ao criar/alternar tipo: preferida do tipo ou a primeira disponível. */
+function defaultCategoryFor(
+  kind: ExpenseKind,
+  categories: ReturnType<typeof useApp>["categories"]
+): string {
+  const preferred = kind === "income" ? "salario" : "outros";
+  const ofKind = categories
+    .filter((c) => c.kind === kind)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  return (
+    ofKind.find((c) => c.key === preferred)?.key ?? ofKind[0]?.key ?? fallbackCategoryFor(kind).key
+  );
+}
 
 export default function ExpenseModal({
   open,
@@ -44,13 +59,14 @@ export default function ExpenseModal({
     setConfirmDelete(false);
     setBusy(false);
     if (expense) {
-      setKind(expense.kind ?? "expense");
+      const k: ExpenseKind = expense.kind ?? "expense";
+      setKind(k);
       setType(expense.type ?? "fixed");
       setDescription(expense.description ?? "");
       setAmountText(String(expense.amount ?? "").replace(".", ","));
       setInstallments(expense.installments ?? 12);
       setMonth(expense.startMonth ?? expense.referenceMonth ?? defaultMonth);
-      setCategory(expense.category ?? "outros");
+      setCategory(expense.category ?? defaultCategoryFor(k, categories));
     } else {
       setKind("expense");
       setType("fixed");
@@ -58,11 +74,23 @@ export default function ExpenseModal({
       setAmountText("");
       setInstallments(12);
       setMonth(defaultMonth || currentMonthKey());
-      setCategory("outros");
+      setCategory(defaultCategoryFor("expense", categories));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, expense, defaultMonth]);
 
   if (!open) return null;
+
+  function handleKindChange(next: ExpenseKind) {
+    if (next === kind) return;
+    setKind(next);
+    // A categoria selecionada pode não pertencer ao novo tipo: volta ao padrão.
+    setCategory(defaultCategoryFor(next, categories));
+  }
+
+  const sortedCategories = [...categories]
+    .filter((c) => c.kind === kind)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 
   const amount = parseAmount(amountText);
   const perMonth =
@@ -89,11 +117,14 @@ export default function ExpenseModal({
       return;
     }
     const isInstallment = kind === "expense" && type === "installment";
+    const validCategory = sortedCategories.some((c) => c.key === category)
+      ? category
+      : fallbackCategoryFor(kind).key;
     setBusy(true);
     setError(null);
     onSubmit({
       description: description.trim(),
-      category,
+      category: validCategory,
       kind,
       type: isInstallment ? "installment" : "fixed",
       amount,
@@ -121,8 +152,6 @@ export default function ExpenseModal({
     });
     onClose();
   }
-
-  const sortedCategories = [...categories].sort((a, b) => a.sortOrder - b.sortOrder);
 
   return (
     <div
@@ -164,7 +193,7 @@ export default function ExpenseModal({
               <button
                 key={value}
                 type="button"
-                onClick={() => setKind(value)}
+                onClick={() => handleKindChange(value)}
                 className={`rounded-lg py-2 text-sm font-medium transition-colors ${
                   kind === value
                     ? value === "income"
