@@ -4,12 +4,12 @@ import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { currentMonthKey } from "@/lib/months";
-import MonthView from "@/components/MonthView";
+import DashboardScreen from "@/components/DashboardScreen";
 import BottomNav from "@/components/BottomNav";
 import LoadingScreen from "@/components/LoadingScreen";
 import SetupNotice from "@/components/SetupNotice";
 
-function HomeContent() {
+function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const status = useRequireAuth();
@@ -25,21 +25,21 @@ function HomeContent() {
   const monthKey = validMonthKey(searchParams.get("mes"));
 
   function setMonth(next: string) {
-    router.replace(`/?mes=${next}`, { scroll: false });
+    router.replace(`/dashboard?mes=${next}`, { scroll: false });
   }
 
   return (
     <>
-      <MonthView monthKey={monthKey} onMonthChange={setMonth} />
+      <DashboardScreen monthKey={monthKey} onMonthChange={setMonth} />
       <BottomNav />
     </>
   );
 }
 
-export default function HomePage() {
+export default function DashboardPage() {
   return (
     <Suspense fallback={<LoadingScreen />}>
-      <HomeContent />
+      <DashboardContent />
     </Suspense>
   );
 }

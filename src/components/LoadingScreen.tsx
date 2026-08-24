@@ -1,0 +1,13 @@
+export default function LoadingScreen() {
+  return (
+    <main
+      className="flex min-h-dvh items-center justify-center bg-zinc-50 dark:bg-zinc-950"
+      aria-busy="true"
+      aria-label="Carregando"
+    >
+      <span className="flex h-10 w-10 animate-pulse items-center justify-center rounded-xl bg-emerald-500 text-lg font-bold text-white">
+        W
+      </span>
+    </main>
+  );
+}

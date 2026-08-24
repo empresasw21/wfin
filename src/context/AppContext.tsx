@@ -12,22 +12,50 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase";
-import { toDbRow, toExpense } from "@/lib/db";
+import { categoryToDbRow, toCategory, toDbRow, toExpense } from "@/lib/db";
 import { fixedForMonth } from "@/lib/calc";
 import { shiftMonth } from "@/lib/months";
-import type { Expense, ExpenseInput } from "@/lib/types";
+import { nextSortOrder, slugify, uniqueKey } from "@/lib/categories";
+import {
+  DEFAULT_CATEGORIES,
+  FALLBACK_CATEGORY,
+  type Category,
+  type CategoryInput,
+  type Expense,
+  type ExpenseInput,
+  type ExpenseKind,
+} from "@/lib/types";
+import dynamic from "next/dynamic";
+
+const ExpenseModal = dynamic(() => import("@/components/ExpenseModal"), { ssr: false });
+const CategoriesModal = dynamic(() => import("@/components/CategoriesModal"), { ssr: false });
 
 interface AppState {
   user: User | null;
   authLoading: boolean;
   expenses: Expense[];
   dataLoading: boolean;
+  categories: Category[];
   error: string | null;
   addExpense: (input: ExpenseInput) => Promise<void>;
   updateExpense: (id: string, input: ExpenseInput) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
-  copyFixedFromPreviousMonth: (targetKey: string) => Promise<number>;
+  copyFromPreviousMonth: (targetKey: string, kind: ExpenseKind) => Promise<number>;
+  addCategory: (input: Omit<CategoryInput, "key" | "sortOrder">) => Promise<void>;
+  updateCategory: (key: string, input: Pick<CategoryInput, "label" | "emoji">) => Promise<void>;
+  deleteCategory: (key: string) => Promise<void>;
   signOut: () => Promise<void>;
+  // Diálogos globais
+  dialogMonth: string;
+  setDialogMonth: (key: string) => void;
+  openNewExpense: () => void;
+  openEditExpense: (expense: Expense) => void;
+  closeExpenseDialog: () => void;
+  expenseDialogOpen: boolean;
+  editingExpense: Expense | null;
+  openCategories: () => void;
+  closeCategories: () => void;
+  categoriesOpen: boolean;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -42,8 +70,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [authLoading, setAuthLoading] = useState(supabaseConfigured);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [error, setError] = useState<string | null>(null);
   const userIdRef = useRef<string | null>(null);
+  const seededRef = useRef<string | null>(null);
+
+  const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [dialogMonth, setDialogMonth] = useState("");
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
 
   useEffect(() => {
     if (!supabaseConfigured) return;
@@ -59,17 +94,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session: Session | null) => {
       setUser(session?.user ?? null);
-      if (!session) setExpenses([]);
+      if (!session) {
+        setExpenses([]);
+        setCategories([]);
+        userIdRef.current = null;
+        seededRef.current = null;
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (!user) {
-      userIdRef.current = null;
-      return;
-    }
-    if (userIdRef.current === user.id) return;
+    if (!user || userIdRef.current === user.id) return;
     userIdRef.current = user.id;
     const supabase = getSupabase();
     setDataLoading(true);
@@ -84,6 +120,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
         else setExpenses((data ?? []).map(toExpense));
         setDataLoading(false);
       });
+
+    supabase
+      .from("categories")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("sort_order", { ascending: true })
+      .then(async ({ data, error: err }) => {
+        if (err) return;
+        let list = (data ?? []).map(toCategory);
+        if (list.length === 0 && seededRef.current !== user.id) {
+          seededRef.current = user.id;
+          const rows = DEFAULT_CATEGORIES.map((c, i) =>
+            categoryToDbRow({
+              userId: user.id,
+              key: c.key,
+              label: c.label,
+              emoji: c.emoji,
+              sortOrder: (i + 1) * 10,
+            })
+          );
+          const { data: inserted, error: insertErr } = await supabase
+            .from("categories")
+            .insert(rows)
+            .select();
+          if (!insertErr && inserted) list = inserted.map(toCategory);
+        }
+        if (seededRef.current === user.id || list.length > 0) setCategories(list);
+      });
   }, [user]);
 
   const addExpense = useCallback(
@@ -91,11 +155,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const supabase = getSupabase();
       if (!user) throw new Error("Sessão expirada. Faça login novamente.");
       const row = toDbRow({ ...input, id: "" });
-      const { data, error: err } = await supabase
-        .from("expenses")
-        .insert(row)
-        .select()
-        .single();
+      const { data, error: err } = await supabase.from("expenses").insert(row).select().single();
       if (err) throw new Error(messageOf(err));
       setExpenses((prev) => [...prev, toExpense(data)]);
     },
@@ -123,18 +183,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setExpenses((prev) => prev.filter((e) => e.id !== id));
   }, []);
 
-  const copyFixedFromPreviousMonth = useCallback(
-    async (targetKey: string): Promise<number> => {
+  const copyFromPreviousMonth = useCallback(
+    async (targetKey: string, kind: ExpenseKind): Promise<number> => {
       const supabase = getSupabase();
       if (!user) throw new Error("Sessão expirada. Faça login novamente.");
       const prevKey = shiftMonth(targetKey, -1);
-      const prevFixed = fixedForMonth(expenses, prevKey);
+      const prevEntries = fixedForMonth(expenses, prevKey, kind);
       const existing = new Set(
-        fixedForMonth(expenses, targetKey).map((e) =>
-          `${e.description.trim().toLowerCase()}::${e.category}`
+        fixedForMonth(expenses, targetKey, kind).map(
+          (e) => `${e.description.trim().toLowerCase()}::${e.category}`
         )
       );
-      const missing = prevFixed.filter(
+      const missing = prevEntries.filter(
         (e) => !existing.has(`${e.description.trim().toLowerCase()}::${e.category}`)
       );
       if (missing.length === 0) return 0;
@@ -143,6 +203,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           id: "",
           description: e.description,
           category: e.category,
+          kind,
           type: "fixed",
           amount: e.amount,
           installments: null,
@@ -158,9 +219,85 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [expenses, user]
   );
 
+  const addCategory = useCallback(
+    async (input: Omit<CategoryInput, "key" | "sortOrder">) => {
+      const supabase = getSupabase();
+      if (!user) throw new Error("Sessão expirada. Faça login novamente.");
+      const label = input.label.trim();
+      if (!label) throw new Error("Informe um nome para a categoria.");
+      const keys = new Set(categories.map((c) => c.key));
+      const key = uniqueKey(slugify(label), keys);
+      const row = categoryToDbRow({
+        userId: user.id,
+        key,
+        label,
+        emoji: input.emoji || FALLBACK_CATEGORY.emoji,
+        sortOrder: nextSortOrder(categories),
+      });
+      const { data, error: err } = await supabase.from("categories").insert(row).select().single();
+      if (err) throw new Error(messageOf(err));
+      setCategories((prev) => [...prev, toCategory(data)]);
+    },
+    [categories, user]
+  );
+
+  const updateCategory = useCallback(
+    async (key: string, input: Pick<CategoryInput, "label" | "emoji">) => {
+      const supabase = getSupabase();
+      const label = input.label.trim();
+      if (!label) throw new Error("Informe um nome para a categoria.");
+      const { error: err } = await supabase
+        .from("categories")
+        .update({ label, emoji: input.emoji || FALLBACK_CATEGORY.emoji })
+        .eq("key", key);
+      if (err) throw new Error(messageOf(err));
+      setCategories((prev) =>
+        prev.map((c) =>
+          c.key === key ? { ...c, label, emoji: input.emoji || FALLBACK_CATEGORY.emoji } : c
+        )
+      );
+    },
+    []
+  );
+
+  const deleteCategory = useCallback(
+    async (key: string) => {
+      const supabase = getSupabase();
+      if (key === FALLBACK_CATEGORY.key) {
+        throw new Error('A categoria "Outros" não pode ser excluída.');
+      }
+      const { error: updErr } = await supabase
+        .from("expenses")
+        .update({ category: FALLBACK_CATEGORY.key })
+        .eq("category", key);
+      if (updErr) throw new Error(messageOf(updErr));
+      setExpenses((prev) =>
+        prev.map((e) => (e.category === key ? { ...e, category: FALLBACK_CATEGORY.key } : e))
+      );
+      const { error: err } = await supabase.from("categories").delete().eq("key", key);
+      if (err) throw new Error(messageOf(err));
+      setCategories((prev) => prev.filter((c) => c.key !== key));
+    },
+    []
+  );
+
   const signOut = useCallback(async () => {
     await getSupabase().auth.signOut();
   }, []);
+
+  const openNewExpense = useCallback(() => {
+    setEditingExpense(null);
+    setExpenseDialogOpen(true);
+  }, []);
+
+  const openEditExpense = useCallback((expense: Expense) => {
+    setEditingExpense(expense);
+    setExpenseDialogOpen(true);
+  }, []);
+
+  const closeExpenseDialog = useCallback(() => setExpenseDialogOpen(false), []);
+  const openCategories = useCallback(() => setCategoriesOpen(true), []);
+  const closeCategories = useCallback(() => setCategoriesOpen(false), []);
 
   const value = useMemo<AppState>(
     () => ({
@@ -168,28 +305,69 @@ export function AppProvider({ children }: { children: ReactNode }) {
       authLoading,
       expenses,
       dataLoading,
+      categories,
       error,
       addExpense,
       updateExpense,
       deleteExpense,
-      copyFixedFromPreviousMonth,
+      copyFromPreviousMonth,
+      addCategory,
+      updateCategory,
+      deleteCategory,
       signOut,
+      dialogMonth,
+      setDialogMonth,
+      openNewExpense,
+      openEditExpense,
+      closeExpenseDialog,
+      expenseDialogOpen,
+      editingExpense,
+      openCategories,
+      closeCategories,
+      categoriesOpen,
     }),
     [
       user,
       authLoading,
       expenses,
       dataLoading,
+      categories,
       error,
       addExpense,
       updateExpense,
       deleteExpense,
-      copyFixedFromPreviousMonth,
+      copyFromPreviousMonth,
+      addCategory,
+      updateCategory,
+      deleteCategory,
       signOut,
+      dialogMonth,
+      openNewExpense,
+      openEditExpense,
+      closeExpenseDialog,
+      expenseDialogOpen,
+      editingExpense,
+      openCategories,
+      closeCategories,
+      categoriesOpen,
     ]
   );
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={value}>
+      {children}
+      <ExpenseModal
+        open={expenseDialogOpen}
+        expense={editingExpense}
+        defaultMonth={dialogMonth}
+        onClose={closeExpenseDialog}
+        onSubmit={editingExpense ? updateExpense.bind(null, editingExpense.id) : addExpense}
+        onDelete={deleteExpense}
+        onManageCategories={openCategories}
+      />
+      <CategoriesModal open={categoriesOpen} onClose={closeCategories} />
+    </AppContext.Provider>
+  );
 }
 
 export function useApp(): AppState {

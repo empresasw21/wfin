@@ -3,8 +3,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { fmtBRL, parseAmount } from "@/lib/format";
 import { currentMonthKey, monthLabel } from "@/lib/months";
-import { CATEGORIES, type Expense, type ExpenseInput, type ExpenseType } from "@/lib/types";
-import { CloseIcon, TrashIcon } from "./icons";
+import { useApp } from "@/context/AppContext";
+import type { ExpenseInput, ExpenseKind, ExpenseType } from "@/lib/types";
+import { CloseIcon, TagsIcon, TrashIcon } from "./icons";
 
 const QUICK_INSTALLMENTS = [2, 3, 6, 10, 12, 24];
 
@@ -15,19 +16,23 @@ export default function ExpenseModal({
   onClose,
   onSubmit,
   onDelete,
+  onManageCategories,
 }: {
   open: boolean;
-  expense: Expense | null;
+  expense: ExpenseInput & { id?: string } | null;
   defaultMonth: string;
   onClose: () => void;
   onSubmit: (input: ExpenseInput) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onManageCategories: () => void;
 }) {
+  const { categories } = useApp();
+  const [kind, setKind] = useState<ExpenseKind>("expense");
   const [type, setType] = useState<ExpenseType>("fixed");
   const [description, setDescription] = useState("");
   const [amountText, setAmountText] = useState("");
   const [installments, setInstallments] = useState(12);
-  const [startMonth, setStartMonth] = useState(defaultMonth);
+  const [month, setMonth] = useState(defaultMonth || currentMonthKey());
   const [category, setCategory] = useState("outros");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,18 +44,20 @@ export default function ExpenseModal({
     setConfirmDelete(false);
     setBusy(false);
     if (expense) {
-      setType(expense.type);
-      setDescription(expense.description);
-      setAmountText(String(expense.amount).replace(".", ","));
+      setKind(expense.kind ?? "expense");
+      setType(expense.type ?? "fixed");
+      setDescription(expense.description ?? "");
+      setAmountText(String(expense.amount ?? "").replace(".", ","));
       setInstallments(expense.installments ?? 12);
-      setStartMonth(expense.startMonth ?? expense.referenceMonth ?? defaultMonth);
-      setCategory(expense.category);
+      setMonth(expense.startMonth ?? expense.referenceMonth ?? defaultMonth);
+      setCategory(expense.category ?? "outros");
     } else {
+      setKind("expense");
       setType("fixed");
       setDescription("");
       setAmountText("");
       setInstallments(12);
-      setStartMonth(defaultMonth);
+      setMonth(defaultMonth || currentMonthKey());
       setCategory("outros");
     }
   }, [open, expense, defaultMonth]);
@@ -59,7 +66,11 @@ export default function ExpenseModal({
 
   const amount = parseAmount(amountText);
   const perMonth =
-    type === "installment" && Number.isFinite(amount) && amount > 0 && installments >= 2
+    kind === "expense" &&
+    type === "installment" &&
+    Number.isFinite(amount) &&
+    amount > 0 &&
+    installments >= 2
       ? amount / installments
       : null;
 
@@ -73,20 +84,22 @@ export default function ExpenseModal({
       setError("Informe uma descrição.");
       return;
     }
-    if (type === "installment" && installments < 2) {
+    if (kind === "expense" && type === "installment" && installments < 2) {
       setError("O parcelamento precisa de pelo menos 2 parcelas.");
       return;
     }
+    const isInstallment = kind === "expense" && type === "installment";
     setBusy(true);
     setError(null);
     onSubmit({
       description: description.trim(),
       category,
-      type,
+      kind,
+      type: isInstallment ? "installment" : "fixed",
       amount,
-      installments: type === "installment" ? installments : null,
-      startMonth: type === "installment" ? startMonth || currentMonthKey() : null,
-      referenceMonth: type === "fixed" ? startMonth || currentMonthKey() : null,
+      installments: isInstallment ? installments : null,
+      startMonth: isInstallment ? month || currentMonthKey() : null,
+      referenceMonth: month || currentMonthKey(),
     })
       .then(onClose)
       .catch((err: unknown) => {
@@ -96,7 +109,7 @@ export default function ExpenseModal({
   }
 
   async function handleDelete() {
-    if (!expense) return;
+    if (!expense?.id) return;
     if (!confirmDelete) {
       setConfirmDelete(true);
       return;
@@ -109,12 +122,14 @@ export default function ExpenseModal({
     onClose();
   }
 
+  const sortedCategories = [...categories].sort((a, b) => a.sortOrder - b.sortOrder);
+
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={expense ? "Editar despesa" : "Nova despesa"}
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+      aria-label={expense ? "Editar lançamento" : "Novo lançamento"}
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -126,7 +141,7 @@ export default function ExpenseModal({
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-zinc-200 dark:bg-zinc-700 sm:hidden" />
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
-            {expense ? "Editar despesa" : "Nova despesa"}
+            {expense ? "Editar lançamento" : "Novo lançamento"}
           </h2>
           <button
             type="button"
@@ -142,17 +157,19 @@ export default function ExpenseModal({
           <div className="grid grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
             {(
               [
-                ["fixed", "Fixa mensal"],
-                ["installment", "Parcelada"],
+                ["expense", "Despesa"],
+                ["income", "Receita"],
               ] as const
             ).map(([value, label]) => (
               <button
                 key={value}
                 type="button"
-                onClick={() => setType(value)}
+                onClick={() => setKind(value)}
                 className={`rounded-lg py-2 text-sm font-medium transition-colors ${
-                  type === value
-                    ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-50"
+                  kind === value
+                    ? value === "income"
+                      ? "bg-teal-500 text-white shadow-sm"
+                      : "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-50"
                     : "text-zinc-500 dark:text-zinc-400"
                 }`}
               >
@@ -161,11 +178,35 @@ export default function ExpenseModal({
             ))}
           </div>
 
+          {kind === "expense" && (
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
+              {(
+                [
+                  ["fixed", "Fixa mensal"],
+                  ["installment", "Parcelada"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setType(value)}
+                  className={`rounded-lg py-2 text-sm font-medium transition-colors ${
+                    type === value
+                      ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-50"
+                      : "text-zinc-500 dark:text-zinc-400"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
           <Field label="Descrição">
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Ex.: Aluguel, Notebook, Netflix..."
+              placeholder={kind === "income" ? "Ex.: Salário, freelance..." : "Ex.: Aluguel, Notebook, Netflix..."}
               maxLength={60}
               className={inputClass}
               autoFocus={!expense}
@@ -173,7 +214,7 @@ export default function ExpenseModal({
           </Field>
 
           <Field
-            label={type === "fixed" ? "Valor mensal" : "Valor total da compra"}
+            label={kind === "income" ? "Valor recebido" : type === "fixed" ? "Valor mensal" : "Valor total da compra"}
             hint={
               perMonth !== null
                 ? `= ${fmtBRL(perMonth)} por mês em ${installments}x`
@@ -194,7 +235,7 @@ export default function ExpenseModal({
             </div>
           </Field>
 
-          {type === "installment" && (
+          {kind === "expense" && type === "installment" && (
             <Field label="Número de parcelas">
               <input
                 value={installments}
@@ -226,30 +267,36 @@ export default function ExpenseModal({
             </Field>
           )}
 
-          <Field label={type === "fixed" ? "Mês de referência" : "Mês da 1ª parcela"}>
+          <Field
+            label={
+              kind === "expense" && type === "installment"
+                ? "Mês da 1ª parcela"
+                : "Mês de referência"
+            }
+          >
             <input
               type="month"
-              value={startMonth}
-              onChange={(e) => setStartMonth(e.target.value)}
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
               max="2099-12"
               className={inputClass}
             />
-            {startMonth && (
-              <p className="mt-1.5 text-xs text-zinc-400">{monthLabel(startMonth)}</p>
-            )}
+            {month && <p className="mt-1.5 text-xs text-zinc-400">{monthLabel(month)}</p>}
           </Field>
 
           <Field label="Categoria">
             <div className="grid grid-cols-4 gap-1.5">
-              {CATEGORIES.map((c) => (
+              {sortedCategories.map((c) => (
                 <button
-                  key={c.id}
+                  key={c.key}
                   type="button"
-                  onClick={() => setCategory(c.id)}
+                  onClick={() => setCategory(c.key)}
                   title={c.label}
                   className={`flex flex-col items-center gap-1 rounded-xl border px-1 py-2 transition-colors ${
-                    category === c.id
-                      ? "border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-500/10"
+                    category === c.key
+                      ? kind === "income"
+                        ? "border-teal-500 bg-teal-50 dark:border-teal-500 dark:bg-teal-500/10"
+                        : "border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-500/10"
                       : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
                   }`}
                 >
@@ -258,8 +305,10 @@ export default function ExpenseModal({
                   </span>
                   <span
                     className={`w-full truncate text-center text-[9px] ${
-                      category === c.id
-                        ? "font-semibold text-emerald-700 dark:text-emerald-400"
+                      category === c.key
+                        ? kind === "income"
+                          ? "font-semibold text-teal-700 dark:text-teal-400"
+                          : "font-semibold text-emerald-700 dark:text-emerald-400"
                         : "text-zinc-500 dark:text-zinc-400"
                     }`}
                   >
@@ -268,16 +317,27 @@ export default function ExpenseModal({
                 </button>
               ))}
             </div>
+            <button
+              type="button"
+              onClick={onManageCategories}
+              className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
+            >
+              <TagsIcon className="h-3.5 w-3.5" />
+              Gerenciar categorias
+            </button>
           </Field>
 
           {error && (
-            <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400">
+            <p
+              role="alert"
+              className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600 dark:bg-red-500/10 dark:text-red-400"
+            >
               {error}
             </p>
           )}
 
           <div className="flex gap-2 pt-1">
-            {expense && (
+            {expense?.id && (
               <button
                 type="button"
                 onClick={handleDelete}
@@ -287,7 +347,7 @@ export default function ExpenseModal({
                     ? "border-red-600 bg-red-600 text-white"
                     : "border-red-200 text-red-500 hover:bg-red-50 dark:border-red-500/30 dark:hover:bg-red-500/10"
                 }`}
-                title={confirmDelete ? "Toque novamente para confirmar" : "Excluir despesa"}
+                title={confirmDelete ? "Toque novamente para confirmar" : "Excluir lançamento"}
               >
                 {confirmDelete ? (
                   <span className="px-1 text-[10px] font-bold leading-tight">Certeza?</span>
@@ -299,7 +359,11 @@ export default function ExpenseModal({
             <button
               type="submit"
               disabled={busy}
-              className="h-11 flex-1 rounded-xl bg-emerald-500 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+              className={`h-11 flex-1 rounded-xl text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                kind === "income"
+                  ? "bg-teal-500 hover:bg-teal-600"
+                  : "bg-emerald-500 hover:bg-emerald-600"
+              }`}
             >
               {busy ? "Salvando..." : "Salvar"}
             </button>
@@ -326,7 +390,9 @@ function Field({
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">{label}</span>
       {children}
-      {hint && <span className="mt-1.5 block text-xs font-medium text-emerald-600 dark:text-emerald-400">{hint}</span>}
+      {hint && (
+        <span className="mt-1.5 block text-xs font-medium text-emerald-600 dark:text-emerald-400">{hint}</span>
+      )}
     </label>
   );
 }

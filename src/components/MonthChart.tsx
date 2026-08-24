@@ -21,7 +21,7 @@ export default function MonthChart({
   return (
     <section aria-label="Evolução dos últimos 6 meses">
       <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-        Últimos 6 meses
+        Gastos · últimos 6 meses
       </h2>
       <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex h-32 items-end justify-between gap-2">

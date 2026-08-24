@@ -1,22 +1,39 @@
 export type ExpenseType = "fixed" | "installment";
+export type ExpenseKind = "expense" | "income";
 
 export interface Expense {
   id: string;
   userId: string;
   description: string;
   category: string;
+  /** Despesa ou receita. Receitas são sempre lançamentos mensais (type fixed). */
+  kind: ExpenseKind;
   type: ExpenseType;
-  /** Fixa: valor mensal. Parcelada: valor total da compra. */
+  /**
+   * Despesa fixa: valor mensal. Parcelada: valor total da compra.
+   * Receita: valor recebido no mês.
+   */
   amount: number;
   installments: number | null;
-  /** Primeiro mês da parcela ("YYYY-MM"). Apenas parceladas. */
+  /** Primeiro mês da parcela ("YYYY-MM"). Apenas despesas parceladas. */
   startMonth: string | null;
-  /** Mês de referência do lançamento fixo ("YYYY-MM"). Apenas fixas. */
+  /** Mês de referência do lançamento fixo/receita ("YYYY-MM"). */
   referenceMonth: string | null;
   createdAt: string;
 }
 
 export type ExpenseInput = Omit<Expense, "id" | "userId" | "createdAt">;
+
+export interface Category {
+  userId: string;
+  key: string;
+  label: string;
+  emoji: string;
+  sortOrder: number;
+  createdAt?: string;
+}
+
+export type CategoryInput = Omit<Category, "userId" | "createdAt">;
 
 export interface CategoryDef {
   id: string;
@@ -24,17 +41,21 @@ export interface CategoryDef {
   emoji: string;
 }
 
-export const CATEGORIES: CategoryDef[] = [
-  { id: "moradia", label: "Moradia", emoji: "🏠" },
-  { id: "alimentacao", label: "Alimentação", emoji: "🍽️" },
-  { id: "transporte", label: "Transporte", emoji: "🚗" },
-  { id: "saude", label: "Saúde", emoji: "💊" },
-  { id: "educacao", label: "Educação", emoji: "📚" },
-  { id: "lazer", label: "Lazer", emoji: "🎮" },
-  { id: "assinaturas", label: "Assinaturas", emoji: "🔁" },
-  { id: "outros", label: "Outros", emoji: "📦" },
+/** Categorias semeadas automaticamente no primeiro acesso do usuário. */
+export const DEFAULT_CATEGORIES: Array<CategoryDef & { key: string }> = [
+  { id: "moradia", key: "moradia", label: "Moradia", emoji: "🏠" },
+  { id: "alimentacao", key: "alimentacao", label: "Alimentação", emoji: "🍽️" },
+  { id: "transporte", key: "transporte", label: "Transporte", emoji: "🚗" },
+  { id: "saude", key: "saude", label: "Saúde", emoji: "💊" },
+  { id: "educacao", key: "educacao", label: "Educação", emoji: "📚" },
+  { id: "lazer", key: "lazer", label: "Lazer", emoji: "🎮" },
+  { id: "assinaturas", key: "assinaturas", label: "Assinaturas", emoji: "🔁" },
+  { id: "outros", key: "outros", label: "Outros", emoji: "📦" },
 ];
 
-export function categoryOf(id: string): CategoryDef {
-  return CATEGORIES.find((c) => c.id === id) ?? CATEGORIES[CATEGORIES.length - 1];
-}
+export const FALLBACK_CATEGORY: CategoryDef & { key: string } = {
+  id: "outros",
+  key: "outros",
+  label: "Outros",
+  emoji: "📦",
+};

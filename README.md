@@ -1,19 +1,25 @@
-# WFin — Controle de Despesas Fixas e Parceladas
+# WFin — Controle de Despesas, Receitas e Saldo
 
-Aplicação web responsiva (mobile-first) para registrar despesas fixas e compras parceladas, com **comparação automática mês a mês** mostrando a diferença em **R$ e %**.
+Aplicação web responsiva (mobile-first) para registrar despesas fixas, compras parceladas e **receitas**, com **comparação automática mês a mês** mostrando a diferença em **R$ e %**, saldo mensal e um dashboard completo de análises.
 
 ## Funcionalidades
 
-- **Despesas fixas mensais** — registre contas recorrentes (aluguel, luz, internet...) por mês de referência
-- **Compras parceladas** — informe o valor total, o nº de parcelas e o mês da 1ª parcela; o app calcula o valor de cada parcela, o progresso e quando termina
+- **Despesas fixas mensais** — contas recorrentes (aluguel, luz, internet...) por mês de referência
+- **Compras parceladas** — valor total, nº de parcelas e mês da 1ª parcela; o app calcula parcela, progresso e término
+- **Receitas e saldo** — lançamentos mensais de receita; saldo do mês = receitas − despesas, comparado ao mês anterior
+- **Categorias personalizadas** — crie, renomeie e exclua categorias com emoji; as 8 padrões vêm prontas
 - **Comparação com o mês anterior**
-  - Cards-resumo: total do mês, fixas e parcelas — cada um com variação em R$ e %
-  - Item a item nas fixas: ▲ aumentou / ▼ diminuiu / = igual / ★ novo este mês
-  - Lista de contas do mês anterior que ainda não foram registradas
-- **Copiar mês anterior** — replica as fixas do mês anterior em um toque
-- **Gráfico dos últimos 6 meses** — evolução do total gasto, navegação rápida pelo gráfico
-- **Tema claro/escuro**, **PWA instalável** (atalho na tela inicial do celular)
-- **Multiusuário** com autenticação por e-mail/senha (Supabase Auth + Row Level Security)
+  - Cards-resumo: saldo, receitas, despesas totais, fixas e parcelas — variação em R$ e %
+  - Item a item: ▲ aumentou / ▼ diminuiu / = igual / ★ novo no mês
+  - Lista de lançamentos do mês anterior ainda não registrados
+- **Copiar mês anterior** — replica fixas ou receitas com um toque
+- **Tela de Dashboard**
+  - Resumo do ano: receitas, despesas e saldo (YTD)
+  - Gráfico Receitas × Despesas dos últimos 6 meses
+  - Distribuição de gastos por categoria (rosca) com variação vs. mês anterior
+  - Top 5 maiores despesas do mês · média mensal dos últimos 6 meses
+- **Navegação por tabs inferiores** estilo app, mês compartilhado pela URL (`?mes=YYYY-MM`)
+- **Tema claro/escuro**, **PWA instalável**, autenticação multiusuário (Supabase Auth + RLS)
 
 ## Stack
 
@@ -37,11 +43,14 @@ Acesse http://localhost:3000
 ## Configuração do Supabase (gratuito)
 
 1. Crie um projeto em [supabase.com](https://supabase.com)
-2. No **SQL Editor**, cole e execute o conteúdo de [`supabase/schema.sql`](supabase/schema.sql) — cria a tabela `expenses` com Row Level Security (cada usuário só vê as próprias despesas)
-3. Em **Project Settings → API**, copie:
+2. No **SQL Editor**, cole e execute o conteúdo de [`supabase/schema.sql`](supabase/schema.sql) — cria as tabelas `expenses` (com receitas) e `categories`, com Row Level Security (cada usuário só vê os próprios dados)
+3. **Projetos criados antes da v2** (já tinham só a tabela `expenses`): execute também [`supabase/migration-002.sql`](supabase/migration-002.sql), que adiciona a coluna `kind` (receitas) e a tabela de categorias
+4. Em **Project Settings → API**, copie:
    - `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-4. (Opcional) Em **Authentication → Providers → Email**, desative "Confirm email" se quiser cadastro sem confirmação
+5. (Opcional) Em **Authentication → Providers → Email**, desative "Confirm email" se quiser cadastro sem confirmação
+
+> As 8 categorias padrão são semeadas automaticamente no primeiro login de cada usuário.
 
 ## Deploy na Vercel com atualização automática
 
@@ -56,19 +65,23 @@ Pronto: a cada `git push` na branch `main`, a Vercel compila e publica automatic
 
 ```
 src/
-├── app/              # Páginas (App Router): / e /login
-├── components/       # Dashboard, modal, cards, seções, ícones
-├── context/          # AppContext: sessão + CRUD de despesas
-└── lib/              # Regras de cálculo, formatação, meses, cliente Supabase
-supabase/schema.sql   # Schema + políticas RLS
+├── app/              # Páginas (App Router): /, /dashboard e /login
+├── components/       # MonthView, DashboardScreen, seções, modais, tabs
+├── context/          # AppContext: sessão + CRUD + diálogos globais
+├── hooks/            # useRequireAuth
+└── lib/              # Cálculos, formatação, meses, categorias, Supabase
+supabase/
+├── schema.sql        # Schema completo + políticas RLS
+└── migration-002.sql # Migração p/ bases criadas antes da v2
 ```
 
 ## Roadmap de melhorias
 
-- [ ] Categorias personalizadas e relatório por categoria
+- [x] Categorias personalizadas com emoji
+- [x] Receitas e saldo mensal
+- [x] Tela de dashboard (resumo anual, receitas×despesas, categorias, top despesas)
 - [ ] Exportar/importar dados (CSV)
 - [ ] Lembretes de contas não pagas no mês (notificação push)
-- [ ] Receitas e saldo mensal
 - [ ] Metas de gastos por categoria
 - [ ] Widget de mobile para gasto rápido
 - [ ] Compartilhamento de orçamento familiar (convites)

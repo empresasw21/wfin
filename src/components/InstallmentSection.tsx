@@ -3,7 +3,9 @@
 import { fmtBRL } from "@/lib/format";
 import { remainingAmount } from "@/lib/calc";
 import { installmentStatus, monthLabel, shiftMonth } from "@/lib/months";
-import { categoryOf, type Expense } from "@/lib/types";
+import { categoryOf } from "@/lib/categories";
+import { useApp } from "@/context/AppContext";
+import type { Expense } from "@/lib/types";
 import { EmptyHint } from "./FixedSection";
 import { SectionHeader } from "./SummaryCards";
 
@@ -11,14 +13,15 @@ export default function InstallmentSection({
   expenses,
   prevExpenses,
   monthKey,
-  onEdit,
 }: {
   expenses: Expense[];
   prevExpenses: Expense[];
   monthKey: string;
-  onEdit: (expense: Expense) => void;
 }) {
-  const active = expenses.filter((e) => e.type === "installment" && installmentStatus(e, monthKey).active);
+  const { categories, openEditExpense } = useApp();
+  const active = expenses.filter(
+    (e) => e.kind === "expense" && e.type === "installment" && installmentStatus(e, monthKey).active
+  );
   const total = active.reduce((acc, e) => acc + e.amount / e.installments!, 0);
   const prevActiveIds = new Set(
     prevExpenses
@@ -42,7 +45,7 @@ export default function InstallmentSection({
             return (
               <li key={e.id}>
                 <button
-                  onClick={() => onEdit(e)}
+                  onClick={() => openEditExpense(e)}
                   className="w-full rounded-2xl border border-zinc-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:bg-zinc-800/60"
                 >
                   <div className="flex items-center gap-3">
@@ -50,7 +53,7 @@ export default function InstallmentSection({
                       aria-hidden
                       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-base dark:bg-zinc-800"
                     >
-                      {categoryOf(e.category).emoji}
+                      {categoryOf(categories, e.category).emoji}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5">
