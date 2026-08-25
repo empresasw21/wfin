@@ -1,4 +1,4 @@
-import type { Category, Expense, ExpenseType } from "./types";
+import type { Category, Expense, ExpenseType, Payment } from "./types";
 import { monthKeyToDay } from "./months";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -47,6 +47,25 @@ export function toCategory(row: any): Category {
     kind: row.kind === "income" ? "income" : "expense",
     sortOrder: Number(row.sort_order ?? 100),
     createdAt: row.created_at ? String(row.created_at) : undefined,
+  };
+}
+
+export function toPayment(row: any): Payment {
+  return {
+    id: String(row.id),
+    userId: String(row.user_id),
+    expenseId: String(row.expense_id),
+    month: String(row.month).slice(0, 7),
+    paid: Boolean(row.paid),
+    paidAt: String(row.paid_at ?? new Date().toISOString()),
+  };
+}
+
+export function toPaymentDbRow(payment: { expenseId: string; month: string; paid: boolean }): Record<string, unknown> {
+  return {
+    expense_id: payment.expenseId,
+    month: monthKeyToDay(payment.month),
+    paid: payment.paid,
   };
 }
 

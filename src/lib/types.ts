@@ -24,6 +24,18 @@ export interface Expense {
 
 export type ExpenseInput = Omit<Expense, "id" | "userId" | "createdAt">;
 
+export interface Payment {
+  id: string;
+  userId: string;
+  expenseId: string;
+  /** Mês de referência ("YYYY-MM"). */
+  month: string;
+  paid: boolean;
+  paidAt: string;
+}
+
+export type PaymentInput = Omit<Payment, "id" | "userId" | "paidAt">;
+
 export interface Category {
   userId: string;
   key: string;

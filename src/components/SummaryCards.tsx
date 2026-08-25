@@ -3,7 +3,7 @@
 import { fmtBRL } from "@/lib/format";
 import { statsForMonth } from "@/lib/calc";
 import { shiftMonth } from "@/lib/months";
-import type { Expense } from "@/lib/types";
+import type { Expense, Payment } from "@/lib/types";
 import DeltaBadge from "./DeltaBadge";
 
 function Card({
@@ -43,12 +43,14 @@ function Card({
 
 export default function SummaryCards({
   expenses,
+  payments,
   monthKey,
 }: {
   expenses: Expense[];
+  payments: Payment[];
   monthKey: string;
 }) {
-  const cur = statsForMonth(expenses, monthKey);
+  const cur = statsForMonth(expenses, monthKey, payments);
   const prevStats = statsForMonth(expenses, shiftMonth(monthKey, -1));
 
   const prevOrNull = (prev: number, curr: number) =>
@@ -81,6 +83,15 @@ export default function SummaryCards({
         previous={prevOrNull(prevStats.total, cur.total)}
         accent="bg-emerald-500"
       />
+      {cur.paidTotal > 0 && cur.remainingTotal > 0 && (
+        <Card
+          label="Falta pagar"
+          value={cur.remainingTotal}
+          current={cur.remainingTotal}
+          previous={null}
+          accent="bg-rose-500"
+        />
+      )}
       <Card
         label={`Fixas (${cur.fixedCount})`}
         value={cur.fixedTotal}

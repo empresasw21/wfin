@@ -8,6 +8,7 @@ import { useApp } from "@/context/AppContext";
 import type { Expense } from "@/lib/types";
 import { SectionHeader } from "./SummaryCards";
 import { PencilIcon } from "./icons";
+import PaymentToggle from "./PaymentToggle";
 
 export default function OnceSection({
   expenses,
@@ -33,31 +34,34 @@ export default function OnceSection({
           const cat = lookup(e.category);
           return (
             <li key={e.id}>
-              <button
-                onClick={() => openEditExpense(e)}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-zinc-50 active:bg-zinc-100 dark:hover:bg-zinc-800/60 dark:active:bg-zinc-800"
-              >
-                <span
-                  aria-hidden
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-base dark:bg-orange-500/10"
+              <div className="flex items-center gap-2 px-2 py-1">
+                <PaymentToggle expenseId={e.id} monthKey={monthKey} />
+                <button
+                  onClick={() => openEditExpense(e)}
+                  className="flex min-w-0 flex-1 items-center gap-3 py-2 text-left transition-colors hover:bg-zinc-50 active:bg-zinc-100 dark:hover:bg-zinc-800/60 dark:active:bg-zinc-800"
                 >
-                  {cat.emoji}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1.5">
-                    <span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      {e.description}
+                  <span
+                    aria-hidden
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-base dark:bg-orange-500/10"
+                  >
+                    {cat.emoji}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        {e.description}
+                      </span>
+                      <PencilIcon className="h-3 w-3 shrink-0 text-zinc-300 dark:text-zinc-600" />
                     </span>
-                    <PencilIcon className="h-3 w-3 shrink-0 text-zinc-300 dark:text-zinc-600" />
+                    <span className="mt-1 block text-[11px] font-medium uppercase tracking-wide text-orange-600/80 dark:text-orange-400/80">
+                      Única
+                    </span>
                   </span>
-                  <span className="mt-1 block text-[11px] font-medium uppercase tracking-wide text-orange-600/80 dark:text-orange-400/80">
-                    Única
+                  <span className="shrink-0 text-sm font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">
+                    {fmtBRL(e.amount)}
                   </span>
-                </span>
-                <span className="shrink-0 text-sm font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">
-                  {fmtBRL(e.amount)}
-                </span>
-              </button>
+                </button>
+              </div>
             </li>
           );
         })}

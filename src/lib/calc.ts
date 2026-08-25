@@ -1,4 +1,4 @@
-import type { Expense, ExpenseKind } from "./types";
+import type { Expense, ExpenseKind, Payment } from "./types";
 import { installmentStatus, shiftMonth } from "./months";
 
 export interface MonthStats {
@@ -15,6 +15,10 @@ export interface MonthStats {
   activeInstallments: number;
   onceCount: number;
   incomeCount: number;
+  /** Total de despesas pagas no mês. */
+  paidTotal: number;
+  /** Total de despesas pendentes (a pagar) no mês. */
+  remainingTotal: number;
 }
 
 export interface FixedComparison {
@@ -78,7 +82,7 @@ export function onceForMonth(expenses: Expense[], key: string): Expense[] {
     .sort((a, b) => b.amount - a.amount || a.description.localeCompare(b.description, "pt-BR"));
 }
 
-export function statsForMonth(expenses: Expense[], key: string): MonthStats {
+export function statsForMonth(expenses: Expense[], key: string, payments: Payment[] = []): MonthStats {
   let fixedTotal = 0;
   let installmentTotal = 0;
   let onceTotal = 0;
@@ -87,6 +91,12 @@ export function statsForMonth(expenses: Expense[], key: string): MonthStats {
   let activeInstallments = 0;
   let onceCount = 0;
   let incomeCount = 0;
+  let paidTotal = 0;
+
+  const paidSet = new Set(
+    payments.filter((p) => p.month === key && p.paid).map((p) => p.expenseId)
+  );
+
   for (const e of expenses) {
     if (e.kind === "income") {
       if (e.type === "fixed" && e.referenceMonth === key) {
@@ -96,12 +106,16 @@ export function statsForMonth(expenses: Expense[], key: string): MonthStats {
     } else if (e.type === "fixed" && e.referenceMonth === key) {
       fixedTotal += e.amount;
       fixedCount += 1;
+      if (paidSet.has(e.id)) paidTotal += e.amount;
     } else if (e.type === "once" && e.referenceMonth === key) {
       onceTotal += e.amount;
       onceCount += 1;
+      if (paidSet.has(e.id)) paidTotal += e.amount;
     } else if (e.type === "installment" && installmentStatus(e, key).active) {
-      installmentTotal += e.amount / e.installments!;
+      const perMonth = e.amount / e.installments!;
+      installmentTotal += perMonth;
       activeInstallments += 1;
+      if (paidSet.has(e.id)) paidTotal += perMonth;
     }
   }
   const total = fixedTotal + installmentTotal + onceTotal;
@@ -116,6 +130,8 @@ export function statsForMonth(expenses: Expense[], key: string): MonthStats {
     activeInstallments,
     onceCount,
     incomeCount,
+    paidTotal,
+    remainingTotal: total - paidTotal,
   };
 }
 

@@ -12,7 +12,7 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase";
-import { categoryToDbRow, toCategory, toDbRow, toExpense } from "@/lib/db";
+import { categoryToDbRow, toCategory, toDbRow, toExpense, toPayment, toPaymentDbRow } from "@/lib/db";
 import { fixedForMonth } from "@/lib/calc";
 import { shiftMonth } from "@/lib/months";
 import { nextSortOrder, slugify, uniqueKey } from "@/lib/categories";
@@ -24,6 +24,7 @@ import {
   type Expense,
   type ExpenseInput,
   type ExpenseKind,
+  type Payment,
 } from "@/lib/types";
 import dynamic from "next/dynamic";
 
@@ -34,6 +35,7 @@ interface AppState {
   user: User | null;
   authLoading: boolean;
   expenses: Expense[];
+  payments: Payment[];
   dataLoading: boolean;
   categories: Category[];
   error: string | null;
@@ -44,6 +46,8 @@ interface AppState {
   addCategory: (input: Omit<CategoryInput, "key" | "sortOrder">) => Promise<void>;
   updateCategory: (key: string, input: Pick<CategoryInput, "label" | "emoji">) => Promise<void>;
   deleteCategory: (key: string, kind: ExpenseKind) => Promise<void>;
+  togglePayment: (expenseId: string, monthKey: string, paid: boolean) => Promise<void>;
+  isPaid: (expenseId: string, monthKey: string) => boolean;
   signOut: () => Promise<void>;
   // Diálogos globais
   dialogMonth: string;
@@ -111,6 +115,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(supabaseConfigured);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -139,6 +144,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       if (!session) {
         setExpenses([]);
+        setPayments([]);
         setCategories([]);
         userIdRef.current = null;
         seededRef.current = null;
@@ -163,6 +169,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (err) setError(messageOf(err));
         else setExpenses((data ?? []).map(toExpense));
         setDataLoading(false);
+      });
+
+    supabase
+      .from("payments")
+      .select("*")
+      .eq("user_id", user.id)
+      .then(({ data, error: err }) => {
+        if (!err) setPayments((data ?? []).map(toPayment));
       });
 
     supabase
@@ -414,6 +428,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await getSupabase().auth.signOut();
   }, []);
 
+  const togglePayment = useCallback(
+    async (expenseId: string, monthKey: string, paid: boolean) => {
+      const supabase = getSupabase();
+      if (!user) throw new Error("Sessão expirada. Faça login novamente.");
+
+      const existing = payments.find(
+        (p) => p.expenseId === expenseId && p.month === monthKey
+      );
+
+      if (existing) {
+        const { error: err } = await supabase
+          .from("payments")
+          .update({ paid })
+          .eq("id", existing.id);
+        if (err) throw new Error(messageOf(err));
+        setPayments((prev) =>
+          prev.map((p) => (p.id === existing.id ? { ...p, paid } : p))
+        );
+      } else {
+        const row = { ...toPaymentDbRow({ expenseId, month: monthKey, paid }), user_id: user.id };
+        const { data, error: err } = await supabase
+          .from("payments")
+          .insert(row)
+          .select()
+          .single();
+        if (err) throw new Error(messageOf(err));
+        setPayments((prev) => [...prev, toPayment(data)]);
+      }
+    },
+    [user, payments]
+  );
+
+  const isPaid = useCallback(
+    (expenseId: string, monthKey: string) => {
+      return payments.some((p) => p.expenseId === expenseId && p.month === monthKey && p.paid);
+    },
+    [payments]
+  );
+
   const openNewExpense = useCallback(() => {
     setEditingExpense(null);
     setExpenseDialogOpen(true);
@@ -433,6 +486,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       user,
       authLoading,
       expenses,
+      payments,
       dataLoading,
       categories,
       error,
@@ -443,6 +497,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addCategory,
       updateCategory,
       deleteCategory,
+      togglePayment,
+      isPaid,
       signOut,
       dialogMonth,
       setDialogMonth,
@@ -459,6 +515,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       user,
       authLoading,
       expenses,
+      payments,
       dataLoading,
       categories,
       error,
@@ -469,6 +526,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addCategory,
       updateCategory,
       deleteCategory,
+      togglePayment,
+      isPaid,
       signOut,
       dialogMonth,
       openNewExpense,

@@ -9,6 +9,7 @@ import type { Expense, ExpenseKind } from "@/lib/types";
 import DeltaBadge from "./DeltaBadge";
 import { SectionHeader } from "./SummaryCards";
 import { CopyIcon, PencilIcon } from "./icons";
+import PaymentToggle from "./PaymentToggle";
 
 export function EmptyHint({ emoji, text }: { emoji: string; text: string }) {
   return (
@@ -87,52 +88,55 @@ function MonthlyEntriesSection({
             const cat = lookup(expense.category);
             return (
               <li key={expense.id}>
-                <button
-                  onClick={() => openEditExpense(expense)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-zinc-50 active:bg-zinc-100 dark:hover:bg-zinc-800/60 dark:active:bg-zinc-800"
-                >
-                  <span
-                    aria-hidden
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base ${
-                      kind === "income"
-                        ? "bg-teal-50 dark:bg-teal-500/10"
-                        : "bg-zinc-100 dark:bg-zinc-800"
-                    }`}
+                <div className="flex items-center gap-2 px-2 py-1">
+                  <PaymentToggle expenseId={expense.id} monthKey={monthKey} />
+                  <button
+                    onClick={() => openEditExpense(expense)}
+                    className="flex min-w-0 flex-1 items-center gap-3 py-2 text-left transition-colors hover:bg-zinc-50 active:bg-zinc-100 dark:hover:bg-zinc-800/60 dark:active:bg-zinc-800"
                   >
-                    {cat.emoji}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-1.5">
-                      <span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                        {expense.description}
-                      </span>
-                      <PencilIcon className="h-3 w-3 shrink-0 text-zinc-300 dark:text-zinc-600" />
+                    <span
+                      aria-hidden
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base ${
+                        kind === "income"
+                          ? "bg-teal-50 dark:bg-teal-500/10"
+                          : "bg-zinc-100 dark:bg-zinc-800"
+                      }`}
+                    >
+                      {cat.emoji}
                     </span>
-                    <span className="mt-1 flex flex-wrap items-center gap-1.5">
-                      {expense.amount === 0 ? (
-                        <span className="rounded-full border border-dashed border-amber-400 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:border-amber-500/50 dark:text-amber-400">
-                          informar valor
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1.5">
+                        <span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                          {expense.description}
                         </span>
-                      ) : (
-                        <DeltaBadge
-                          current={expense.amount}
-                          previous={change === "new" ? null : previousTotal}
-                          size="xs"
-                          invert={kind === "income"}
-                        />
-                      )}
+                        <PencilIcon className="h-3 w-3 shrink-0 text-zinc-300 dark:text-zinc-600" />
+                      </span>
+                      <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                        {expense.amount === 0 ? (
+                          <span className="rounded-full border border-dashed border-amber-400 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:border-amber-500/50 dark:text-amber-400">
+                            informar valor
+                          </span>
+                        ) : (
+                          <DeltaBadge
+                            current={expense.amount}
+                            previous={change === "new" ? null : previousTotal}
+                            size="xs"
+                            invert={kind === "income"}
+                          />
+                        )}
+                      </span>
                     </span>
-                  </span>
-                  <span
-                    className={`shrink-0 text-sm font-semibold tabular-nums ${
-                      kind === "income"
-                        ? "text-teal-600 dark:text-teal-400"
-                        : "text-zinc-900 dark:text-zinc-50"
-                    } ${expense.amount === 0 ? "text-zinc-300 dark:text-zinc-600" : ""}`}
-                  >
-                    {expense.amount === 0 ? "—" : `${kind === "income" ? "+" : ""}${fmtBRL(expense.amount)}`}
-                  </span>
-                </button>
+                    <span
+                      className={`shrink-0 text-sm font-semibold tabular-nums ${
+                        kind === "income"
+                          ? "text-teal-600 dark:text-teal-400"
+                          : "text-zinc-900 dark:text-zinc-50"
+                      } ${expense.amount === 0 ? "text-zinc-300 dark:text-zinc-600" : ""}`}
+                    >
+                      {expense.amount === 0 ? "—" : `${kind === "income" ? "+" : ""}${fmtBRL(expense.amount)}`}
+                    </span>
+                  </button>
+                </div>
               </li>
             );
           })}

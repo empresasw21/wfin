@@ -18,6 +18,7 @@ export default function MonthView({
 }) {
   const {
     expenses,
+    payments,
     dataLoading,
     error: dataError,
     copyFromPreviousMonth,
@@ -59,7 +60,7 @@ export default function MonthView({
           </p>
         )}
 
-        <SummaryCards expenses={expenses} monthKey={monthKey} />
+        <SummaryCards expenses={expenses} payments={payments} monthKey={monthKey} />
 
         {dataLoading ? (
           <div className="space-y-2" aria-busy>
