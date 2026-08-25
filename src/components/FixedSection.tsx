@@ -89,7 +89,7 @@ function MonthlyEntriesSection({
             return (
               <li key={expense.id}>
                 <div className="flex items-center gap-3 px-3 py-1.5">
-                  <PaymentToggle expenseId={expense.id} monthKey={monthKey} />
+                  {kind === "expense" && <PaymentToggle expenseId={expense.id} monthKey={monthKey} />}
                   <button
                     onClick={() => openEditExpense(expense)}
                     className="flex min-w-0 flex-1 items-center gap-3 py-2 text-left transition-colors hover:bg-zinc-50 active:bg-zinc-100 dark:hover:bg-zinc-800/60 dark:active:bg-zinc-800"
