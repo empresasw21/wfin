@@ -6,6 +6,7 @@ import Header from "./Header";
 import SummaryCards from "./SummaryCards";
 import { FixedSection, IncomeSection } from "./FixedSection";
 import InstallmentSection from "./InstallmentSection";
+import OnceSection from "./OnceSection";
 import MonthChart from "./MonthChart";
 
 export default function MonthView({
@@ -80,6 +81,7 @@ export default function MonthView({
               onCopyPrevious={() => handleCopyPrevious("expense")}
               copying={copyingKind === "expense"}
             />
+            <OnceSection expenses={expenses} monthKey={monthKey} />
             <InstallmentSection
               expenses={expenses}
               prevExpenses={expenses}

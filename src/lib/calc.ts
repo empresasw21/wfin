@@ -4,7 +4,8 @@ import { installmentStatus, shiftMonth } from "./months";
 export interface MonthStats {
   fixedTotal: number;
   installmentTotal: number;
-  /** Total de despesas do mês (fixas + parcelas). */
+  onceTotal: number;
+  /** Total de despesas do mês (fixas + parcelas + únicas). */
   total: number;
   /** Total de receitas do mês. */
   incomeTotal: number;
@@ -12,6 +13,7 @@ export interface MonthStats {
   balance: number;
   fixedCount: number;
   activeInstallments: number;
+  onceCount: number;
   incomeCount: number;
 }
 
@@ -44,7 +46,7 @@ export function monthlyValue(expense: Expense, key: string): number {
   if (expense.kind === "income") {
     return expense.referenceMonth === key ? expense.amount : 0;
   }
-  if (expense.type === "fixed") {
+  if (expense.type === "fixed" || expense.type === "once") {
     return expense.referenceMonth === key ? expense.amount : 0;
   }
   return installmentStatus(expense, key).active ? expense.amount / expense.installments! : 0;
@@ -69,12 +71,21 @@ export function installmentsForMonth(expenses: Expense[], key: string): Expense[
     );
 }
 
+/** Despesas únicas (pontuais) de um mês, ordenadas por descrição. */
+export function onceForMonth(expenses: Expense[], key: string): Expense[] {
+  return expenses
+    .filter((e) => e.kind === "expense" && e.type === "once" && e.referenceMonth === key)
+    .sort((a, b) => b.amount - a.amount || a.description.localeCompare(b.description, "pt-BR"));
+}
+
 export function statsForMonth(expenses: Expense[], key: string): MonthStats {
   let fixedTotal = 0;
   let installmentTotal = 0;
+  let onceTotal = 0;
   let incomeTotal = 0;
   let fixedCount = 0;
   let activeInstallments = 0;
+  let onceCount = 0;
   let incomeCount = 0;
   for (const e of expenses) {
     if (e.kind === "income") {
@@ -85,20 +96,25 @@ export function statsForMonth(expenses: Expense[], key: string): MonthStats {
     } else if (e.type === "fixed" && e.referenceMonth === key) {
       fixedTotal += e.amount;
       fixedCount += 1;
+    } else if (e.type === "once" && e.referenceMonth === key) {
+      onceTotal += e.amount;
+      onceCount += 1;
     } else if (e.type === "installment" && installmentStatus(e, key).active) {
       installmentTotal += e.amount / e.installments!;
       activeInstallments += 1;
     }
   }
-  const total = fixedTotal + installmentTotal;
+  const total = fixedTotal + installmentTotal + onceTotal;
   return {
     fixedTotal,
     installmentTotal,
+    onceTotal,
     total,
     incomeTotal,
     balance: incomeTotal - total,
     fixedCount,
     activeInstallments,
+    onceCount,
     incomeCount,
   };
 }

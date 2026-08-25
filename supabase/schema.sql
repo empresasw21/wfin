@@ -12,7 +12,7 @@ create table if not exists public.expenses (
   description text not null check (char_length(description) between 1 and 120),
   category text not null default 'outros',
   kind text not null default 'expense' check (kind in ('expense', 'income')),
-  type text not null check (type in ('fixed', 'installment')),
+  type text not null check (type in ('fixed', 'installment', 'once')),
   amount numeric(12, 2) not null check (amount > 0),
   installments int check (installments is null or installments between 2 and 120),
   start_month date check (start_month is null or start_month = date_trunc('month', start_month)),
@@ -24,6 +24,10 @@ alter table public.expenses drop constraint if exists expenses_kind_check;
 alter table public.expenses add constraint expenses_kind_check
   check (kind in ('expense', 'income'));
 
+alter table public.expenses drop constraint if exists expenses_type_check;
+alter table public.expenses add constraint expenses_type_check
+  check (type in ('fixed', 'installment', 'once'));
+
 alter table public.expenses drop constraint if exists expenses_income_shape_check;
 alter table public.expenses add constraint expenses_income_shape_check
   check (
@@ -31,8 +35,15 @@ alter table public.expenses add constraint expenses_income_shape_check
     or (type = 'fixed' and installments is null and start_month is null)
   );
 
+alter table public.expenses drop constraint if exists expenses_once_shape_check;
+alter table public.expenses add constraint expenses_once_shape_check
+  check (
+    type <> 'once'
+    or (installments is null and start_month is null)
+  );
+
 comment on table public.expenses is
-  'Lançamentos do usuário. kind=''expense'' + type=''fixed'': valor mensal em reference_month. kind=''expense'' + type=''installment'': compra total (amount) em installments parcelas a partir de start_month. kind=''income'': receita mensal em reference_month.';
+  'Lançamentos do usuário. kind=''expense'' + type=''fixed'': valor mensal em reference_month. kind=''expense'' + type=''installment'': compra total (amount) em installments parcelas a partir de start_month. kind=''expense'' + type=''once'': gasto pontual (valor cheio) apenas em reference_month. kind=''income'': receita mensal em reference_month.';
 
 -- ============================================================
 -- Categorias personalizadas (por tipo: despesa ou receita)

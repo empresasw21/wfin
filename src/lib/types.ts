@@ -1,4 +1,4 @@
-export type ExpenseType = "fixed" | "installment";
+export type ExpenseType = "fixed" | "installment" | "once";
 export type ExpenseKind = "expense" | "income";
 
 export interface Expense {
@@ -11,7 +11,7 @@ export interface Expense {
   type: ExpenseType;
   /**
    * Despesa fixa: valor mensal. Parcelada: valor total da compra.
-   * Receita: valor recebido no mês.
+   * Única: valor cheio do gasto pontual. Receita: valor recebido no mês.
    */
   amount: number;
   installments: number | null;

@@ -73,7 +73,7 @@ function pgMessage(err: unknown): string | null {
   const c = typeof code === "string" ? code : "";
 
   if (c === "PGRST204" || c === "42703" || /could not find the .* column/i.test(msg)) {
-    return "O banco de dados está desatualizado para esta versão do app. Execute os arquivos supabase/migration-002.sql e migration-003.sql no SQL Editor do Supabase e tente novamente.";
+    return "O banco de dados está desatualizado para esta versão do app. Execute os arquivos supabase/migration-*.sql pendentes (002 a 004) no SQL Editor do Supabase e tente novamente.";
   }
   if (c === "42P01" || /does not exist/i.test(msg)) {
     return "Tabela ausente no banco de dados. Execute supabase/schema.sql no SQL Editor do Supabase.";

@@ -94,6 +94,15 @@ export default function SummaryCards({
           previous={prevOrNull(prevStats.installmentTotal, cur.installmentTotal)}
           accent="bg-amber-500"
         />
+        {cur.onceCount > 0 && (
+          <Card
+            label={`Únicas (${cur.onceCount})`}
+            value={cur.onceTotal}
+            current={cur.onceTotal}
+            previous={prevOrNull(prevStats.onceTotal, cur.onceTotal)}
+            accent="bg-orange-500"
+          />
+        )}
         <div className="min-w-[30%] shrink-0" aria-hidden />
       </div>
     </section>

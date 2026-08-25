@@ -1,7 +1,9 @@
-import type { Category, Expense } from "./types";
+import type { Category, Expense, ExpenseType } from "./types";
 import { monthKeyToDay } from "./months";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+const TYPE_VALUES: ExpenseType[] = ["fixed", "installment", "once"];
 
 export function toExpense(row: any): Expense {
   return {
@@ -10,7 +12,7 @@ export function toExpense(row: any): Expense {
     description: String(row.description),
     category: String(row.category ?? "outros"),
     kind: row.kind === "income" ? "income" : "expense",
-    type: row.type === "installment" ? "installment" : "fixed",
+    type: TYPE_VALUES.includes(row.type) ? row.type : "fixed",
     amount: Number(row.amount),
     installments: row.installments == null ? null : Number(row.installments),
     startMonth: row.start_month ? String(row.start_month).slice(0, 7) : null,
@@ -22,19 +24,17 @@ export function toExpense(row: any): Expense {
 export function toDbRow(expense: Omit<Expense, "userId" | "createdAt">): Record<string, unknown> {
   const isIncome = expense.kind === "income";
   const isInstallment = !isIncome && expense.type === "installment";
+  const hasReferenceMonth = isIncome || expense.type === "fixed" || expense.type === "once";
   return {
     ...(expense.id ? { id: expense.id } : {}),
     description: expense.description,
     category: expense.category,
     kind: isIncome ? "income" : "expense",
-    type: isInstallment ? "installment" : "fixed",
+    type: expense.type,
     amount: expense.amount,
     installments: isInstallment ? (expense.installments ?? 2) : null,
     start_month: isInstallment ? monthKeyToDay(expense.startMonth ?? "") : null,
-    reference_month:
-      isIncome || expense.type === "fixed"
-        ? monthKeyToDay(expense.referenceMonth ?? "")
-        : null,
+    reference_month: hasReferenceMonth ? monthKeyToDay(expense.referenceMonth ?? "") : null,
   };
 }
 

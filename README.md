@@ -5,11 +5,12 @@ Aplicação web responsiva (mobile-first) para registrar despesas fixas, compras
 ## Funcionalidades
 
 - **Despesas fixas mensais** — contas recorrentes (aluguel, luz, internet...) por mês de referência
-- **Compras parceladas** — valor total, nº de parcelas e mês da 1ª parcela; o app calcula parcela, progresso e término
+- **Compras parceladas** — informe o valor total **ou o valor de cada parcela** + nº de parcelas e mês da 1ª; o app calcula o restante, progresso e término
+- **Despesas únicas** — gastos pontuais do mês (presente, reparo...) sem repetição nem comparação item a item
 - **Receitas e saldo** — lançamentos mensais de receita; saldo do mês = receitas − despesas, comparado ao mês anterior
 - **Categorias personalizadas por tipo** — conjuntos separados para despesas e receitas; crie, renomeie e exclua com emoji; as padrões vêm prontas
 - **Comparação com o mês anterior**
-  - Cards-resumo: saldo, receitas, despesas totais, fixas e parcelas — variação em R$ e %
+  - Cards-resumo: saldo, receitas, despesas totais, fixas, parcelas e únicas — variação em R$ e %
   - Item a item: ▲ aumentou / ▼ diminuiu / = igual / ★ novo no mês
   - Lista de lançamentos do mês anterior ainda não registrados
 - **Copiar mês anterior** — replica fixas ou receitas com um toque
@@ -44,7 +45,7 @@ Acesse http://localhost:3000
 
 1. Crie um projeto em [supabase.com](https://supabase.com)
 2. No **SQL Editor**, cole e execute o conteúdo de [`supabase/schema.sql`](supabase/schema.sql) — cria as tabelas `expenses` (com receitas) e `categories` (por tipo), com Row Level Security (cada usuário só vê os próprios dados)
-3. **Projetos criados antes da v2**: execute também [`supabase/migration-002.sql`](supabase/migration-002.sql) (receitas + categorias) e [`supabase/migration-003.sql`](supabase/migration-003.sql) (categorias por tipo)
+3. **Projetos criados antes da v2**: execute também [`supabase/migration-002.sql`](supabase/migration-002.sql) (receitas + categorias), [`supabase/migration-003.sql`](supabase/migration-003.sql) (categorias por tipo) e [`supabase/migration-004.sql`](supabase/migration-004.sql) (despesas únicas)
 4. Em **Project Settings → API**, copie:
    - `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`

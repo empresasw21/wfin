@@ -44,6 +44,8 @@ export default function ExpenseModal({
   const { categories } = useApp();
   const [kind, setKind] = useState<ExpenseKind>("expense");
   const [type, setType] = useState<ExpenseType>("fixed");
+  /** Como o usuário informa o valor da parcelada: total da compra ou por parcela. */
+  const [amountMode, setAmountMode] = useState<"total" | "per">("total");
   const [description, setDescription] = useState("");
   const [amountText, setAmountText] = useState("");
   const [installments, setInstallments] = useState(12);
@@ -58,6 +60,7 @@ export default function ExpenseModal({
     setError(null);
     setConfirmDelete(false);
     setBusy(false);
+    setAmountMode("total");
     if (expense) {
       const k: ExpenseKind = expense.kind ?? "expense";
       setKind(k);
@@ -88,19 +91,47 @@ export default function ExpenseModal({
     setCategory(defaultCategoryFor(next, categories));
   }
 
+  /** Alterna entre informar total/parcela convertendo o valor já digitado. */
+  function switchAmountMode(next: "total" | "per") {
+    if (next === amountMode) return;
+    const k = installments;
+    if (Number.isFinite(amount) && amount > 0 && k >= 2) {
+      const v = next === "per" ? amount / k : amount * k;
+      setAmountText(v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    }
+    setAmountMode(next);
+  }
+
+  /** Ao sair de "Parcelada" no modo por-parcela, converte o valor de volta ao total. */
+  function handleTypeChange(next: ExpenseType) {
+    if (next === type) return;
+    if (
+      type === "installment" &&
+      next !== "installment" &&
+      amountMode === "per" &&
+      Number.isFinite(amount) &&
+      amount > 0 &&
+      installments >= 2
+    ) {
+      setAmountText(
+        (amount * installments).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      );
+    }
+    setType(next);
+  }
+
   const sortedCategories = [...categories]
     .filter((c) => c.kind === kind)
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
+  const isInstallmentType = kind === "expense" && type === "installment";
+  const isOnceType = kind === "expense" && type === "once";
   const amount = parseAmount(amountText);
+  const validSplit = Number.isFinite(amount) && amount > 0 && installments >= 2;
   const perMonth =
-    kind === "expense" &&
-    type === "installment" &&
-    Number.isFinite(amount) &&
-    amount > 0 &&
-    installments >= 2
-      ? amount / installments
-      : null;
+    isInstallmentType && amountMode === "total" && validSplit ? amount / installments : null;
+  const totalFromPer =
+    isInstallmentType && amountMode === "per" && validSplit ? amount * installments : null;
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -120,14 +151,15 @@ export default function ExpenseModal({
     const validCategory = sortedCategories.some((c) => c.key === category)
       ? category
       : fallbackCategoryFor(kind).key;
+    const storedAmount = isInstallment && amountMode === "per" ? amount * installments : amount;
     setBusy(true);
     setError(null);
     onSubmit({
       description: description.trim(),
       category: validCategory,
       kind,
-      type: isInstallment ? "installment" : "fixed",
-      amount,
+      type: isInstallment ? "installment" : isOnceType ? "once" : "fixed",
+      amount: storedAmount,
       installments: isInstallment ? installments : null,
       startMonth: isInstallment ? month || currentMonthKey() : null,
       referenceMonth: month || currentMonthKey(),
@@ -208,19 +240,44 @@ export default function ExpenseModal({
           </div>
 
           {kind === "expense" && (
-            <div className="grid grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
+            <div className="grid grid-cols-3 gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
               {(
                 [
                   ["fixed", "Fixa mensal"],
                   ["installment", "Parcelada"],
+                  ["once", "Única"],
                 ] as const
               ).map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
-                  onClick={() => setType(value)}
-                  className={`rounded-lg py-2 text-sm font-medium transition-colors ${
+                  onClick={() => handleTypeChange(value)}
+                  className={`rounded-lg py-2 text-xs font-medium transition-colors sm:text-sm ${
                     type === value
+                      ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-50"
+                      : "text-zinc-500 dark:text-zinc-400"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {isInstallmentType && (
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
+              {(
+                [
+                  ["total", "Informar total"],
+                  ["per", "Valor da parcela"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => switchAmountMode(value)}
+                  className={`rounded-lg py-2 text-sm font-medium transition-colors ${
+                    amountMode === value
                       ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-50"
                       : "text-zinc-500 dark:text-zinc-400"
                   }`}
@@ -243,11 +300,23 @@ export default function ExpenseModal({
           </Field>
 
           <Field
-            label={kind === "income" ? "Valor recebido" : type === "fixed" ? "Valor mensal" : "Valor total da compra"}
+            label={
+              kind === "income"
+                ? "Valor recebido"
+                : type === "fixed"
+                  ? "Valor mensal"
+                  : isOnceType
+                    ? "Valor total"
+                    : amountMode === "total"
+                      ? "Valor total da compra"
+                      : "Valor de cada parcela"
+            }
             hint={
               perMonth !== null
                 ? `= ${fmtBRL(perMonth)} por mês em ${installments}x`
-                : undefined
+                : totalFromPer !== null
+                  ? `Total: ${fmtBRL(totalFromPer)} em ${installments}x`
+                  : undefined
             }
           >
             <div className="relative">
@@ -264,7 +333,7 @@ export default function ExpenseModal({
             </div>
           </Field>
 
-          {kind === "expense" && type === "installment" && (
+          {isInstallmentType && (
             <Field label="Número de parcelas">
               <input
                 value={installments}
@@ -297,11 +366,7 @@ export default function ExpenseModal({
           )}
 
           <Field
-            label={
-              kind === "expense" && type === "installment"
-                ? "Mês da 1ª parcela"
-                : "Mês de referência"
-            }
+            label={isInstallmentType ? "Mês da 1ª parcela" : "Mês de referência"}
           >
             <input
               type="month"
