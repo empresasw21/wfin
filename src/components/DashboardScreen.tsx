@@ -41,10 +41,10 @@ export default function DashboardScreen({
   const cur = statsForMonth(expenses, monthKey);
 
   return (
-    <div className="min-h-dvh bg-zinc-50 pb-28 dark:bg-zinc-950">
+    <div className="min-h-dvh bg-zinc-50 pb-28 dark:bg-zinc-950 lg:pb-10">
       <Header monthKey={monthKey} onMonthChange={onMonthChange} />
 
-      <main className="mx-auto max-w-lg space-y-5 px-4 pt-4">
+      <main className="mx-auto w-full max-w-lg space-y-5 px-4 pt-4 md:max-w-3xl lg:max-w-5xl">
         {dataError && (
           <p
             role="alert"
@@ -61,11 +61,15 @@ export default function DashboardScreen({
           </div>
         ) : (
           <>
-            <YearSummary expenses={expenses} monthKey={monthKey} />
-            <IncomeExpenseChart expenses={expenses} monthKey={monthKey} />
-            <CategoryDonut expenses={expenses} monthKey={monthKey} />
-            <TopExpensesList expenses={expenses} monthKey={monthKey} />
-            <MonthlyAverageCard expenses={expenses} monthKey={monthKey} />
+            <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-5">
+              <YearSummary expenses={expenses} monthKey={monthKey} />
+              <IncomeExpenseChart expenses={expenses} monthKey={monthKey} />
+              <CategoryDonut expenses={expenses} monthKey={monthKey} />
+              <TopExpensesList expenses={expenses} monthKey={monthKey} />
+              <div className="lg:col-span-2">
+                <MonthlyAverageCard expenses={expenses} monthKey={monthKey} />
+              </div>
+            </div>
 
             <p className="pt-2 text-center text-[11px] text-zinc-400 dark:text-zinc-600">
               Saldo atual do mês selecionado: {fmtBRL(cur.balance)}

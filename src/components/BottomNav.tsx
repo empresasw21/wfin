@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useApp } from "@/context/AppContext";
 import { ChartIcon, HomeIcon, PlusIcon } from "./icons";
 
-const TABS = [
+export const TABS = [
   { href: "/", label: "Início", Icon: HomeIcon, match: (p: string) => p === "/" },
   {
     href: "/dashboard",
@@ -26,7 +26,7 @@ export default function BottomNav() {
   return (
     <nav
       aria-label="Navegação principal"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/95"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/95 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/95 lg:hidden"
     >
       <div className="relative mx-auto grid h-16 max-w-lg grid-cols-2">
         {TABS.map((tab) => {

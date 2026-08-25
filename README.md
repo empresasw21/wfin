@@ -1,6 +1,6 @@
 # WFin — Controle de Despesas, Receitas e Saldo
 
-Aplicação web responsiva (mobile-first) para registrar despesas fixas, compras parceladas e **receitas**, com **comparação automática mês a mês** mostrando a diferença em **R$ e %**, saldo mensal e um dashboard completo de análises.
+Aplicação web responsiva (mobile-first, adaptada para desktop com navegação no topo e layout em múltiplas colunas) para registrar despesas fixas, compras parceladas e **receitas**, com **comparação automática mês a mês** mostrando a diferença em **R$ e %**, saldo mensal e um dashboard completo de análises.
 
 ## Funcionalidades
 
