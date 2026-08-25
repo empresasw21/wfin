@@ -17,6 +17,7 @@ export function toExpense(row: any): Expense {
     installments: row.installments == null ? null : Number(row.installments),
     startMonth: row.start_month ? String(row.start_month).slice(0, 7) : null,
     referenceMonth: row.reference_month ? String(row.reference_month).slice(0, 7) : null,
+    carryForward: Boolean(row.carry_forward),
     createdAt: String(row.created_at ?? new Date().toISOString()),
   };
 }
@@ -35,6 +36,7 @@ export function toDbRow(expense: Omit<Expense, "userId" | "createdAt">): Record<
     installments: isInstallment ? (expense.installments ?? 2) : null,
     start_month: isInstallment ? monthKeyToDay(expense.startMonth ?? "") : null,
     reference_month: hasReferenceMonth ? monthKeyToDay(expense.referenceMonth ?? "") : null,
+    carry_forward: expense.carryForward ?? false,
   };
 }
 

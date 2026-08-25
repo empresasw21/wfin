@@ -62,7 +62,6 @@ export default function ExpenseModal({
     setConfirmDelete(false);
     setBusy(false);
     setAmountMode("total");
-    setCarryForward(false);
     if (expense) {
       const k: ExpenseKind = expense.kind ?? "expense";
       setKind(k);
@@ -74,22 +73,7 @@ export default function ExpenseModal({
       const refMonth = expense.startMonth ?? expense.referenceMonth ?? defaultMonth;
       setMonth(refMonth);
       setCategory(expense.category ?? defaultCategoryFor(k, categories));
-      // Detecta se já existe cópia no próximo mês (valor fixo ativo)
-      if (expense.type === "fixed" && refMonth) {
-        const nextMonth = shiftMonth(refMonth, 1);
-        const desc = (expense.description ?? "").trim().toLowerCase();
-        const cat = expense.category ?? "outros";
-        setCarryForward(
-          expenses.some(
-            (e) =>
-              e.type === "fixed" &&
-              e.kind === k &&
-              e.referenceMonth === nextMonth &&
-              e.description.trim().toLowerCase() === desc &&
-              e.category === cat
-          )
-        );
-      }
+      setCarryForward(Boolean(expense.carryForward));
     } else {
       setKind("expense");
       setType("fixed");
@@ -98,6 +82,7 @@ export default function ExpenseModal({
       setInstallments(12);
       setMonth(defaultMonth || currentMonthKey());
       setCategory(defaultCategoryFor("expense", categories));
+      setCarryForward(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, expense, defaultMonth]);
@@ -173,6 +158,7 @@ export default function ExpenseModal({
       : fallbackCategoryFor(kind).key;
     const storedAmount = isInstallment && amountMode === "per" ? amount * installments : amount;
     const currentMonth = month || currentMonthKey();
+    const isFixedExpense = type === "fixed";
     const input: ExpenseInput = {
       description: description.trim(),
       category: validCategory,
@@ -182,6 +168,7 @@ export default function ExpenseModal({
       installments: isInstallment ? installments : null,
       startMonth: isInstallment ? currentMonth : null,
       referenceMonth: currentMonth,
+      carryForward: isFixedExpense ? carryForward : false,
     };
     setBusy(true);
     setError(null);
@@ -189,7 +176,6 @@ export default function ExpenseModal({
     const nextMonth = shiftMonth(currentMonth, 1);
     const nextMonthInput = { ...input, referenceMonth: nextMonth };
     const isEditing = Boolean(expense?.id);
-    const isFixedExpense = type === "fixed";
 
     async function run() {
       if (isEditing) {
@@ -201,7 +187,7 @@ export default function ExpenseModal({
           const existing = expenses.find(
             (e) =>
               e.type === "fixed" &&
-              e.kind === "expense" &&
+              e.kind === kind &&
               e.referenceMonth === nextMonth &&
               e.description.trim().toLowerCase() === desc &&
               e.category === input.category

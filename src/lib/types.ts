@@ -19,6 +19,8 @@ export interface Expense {
   startMonth: string | null;
   /** Mês de referência do lançamento fixo/receita ("YYYY-MM"). */
   referenceMonth: string | null;
+  /** Se true, a despesa fixa/receita mantém o valor ao ser semeadada nos meses seguintes. */
+  carryForward: boolean;
   createdAt: string;
 }
 
