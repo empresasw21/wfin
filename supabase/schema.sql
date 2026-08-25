@@ -13,7 +13,7 @@ create table if not exists public.expenses (
   category text not null default 'outros',
   kind text not null default 'expense' check (kind in ('expense', 'income')),
   type text not null check (type in ('fixed', 'installment', 'once')),
-  amount numeric(12, 2) not null check (amount > 0),
+  amount numeric(12, 2) not null check (amount >= 0),
   installments int check (installments is null or installments between 2 and 120),
   start_month date check (start_month is null or start_month = date_trunc('month', start_month)),
   reference_month date check (reference_month is null or reference_month = date_trunc('month', reference_month)),

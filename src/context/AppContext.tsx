@@ -104,6 +104,9 @@ function messageOf(err: unknown): string {
   return "Ocorreu um erro inesperado. Tente novamente.";
 }
 
+/** Meses/tipos já semeados automaticamente (por usuário) — evita recriar o que foi excluído. */
+const SEED_STORE_KEY = "wfin-seeded-months";
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(supabaseConfigured);
@@ -113,6 +116,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const userIdRef = useRef<string | null>(null);
   const seededRef = useRef<string | null>(null);
+  const autoSeedRef = useRef<Set<string>>(new Set());
 
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -138,6 +142,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setCategories([]);
         userIdRef.current = null;
         seededRef.current = null;
+        autoSeedRef.current = new Set();
       }
     });
     return () => sub.subscription.unsubscribe();
@@ -200,6 +205,72 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setCategories(list);
       });
   }, [user]);
+
+  /**
+   * Semeadura automática de fixas/receitas zeradas: ao abrir um mês ainda
+   * vazio daquele tipo, replica os lançamentos do mês anterior com amount 0
+   * para o usuário preencher. Marca cada (usuário, mês, tipo) uma única vez
+   * (ref + localStorage) — exclusões manuais são respeitadas depois.
+   */
+  useEffect(() => {
+    if (!supabaseConfigured || !user || dataLoading || !dialogMonth) return;
+    const monthKey = dialogMonth;
+    const supabase = getSupabase();
+
+    const readStore = (): Set<string> => {
+      try {
+        return new Set<string>(JSON.parse(localStorage.getItem(SEED_STORE_KEY) ?? "[]"));
+      } catch {
+        return new Set<string>();
+      }
+    };
+    const mark = (stamp: string) => {
+      autoSeedRef.current.add(stamp);
+      const store = readStore();
+      store.add(stamp);
+      try {
+        localStorage.setItem(SEED_STORE_KEY, JSON.stringify([...store]));
+      } catch {}
+    };
+
+    for (const kind of ["expense", "income"] as ExpenseKind[]) {
+      const stamp = `${user.id}:${monthKey}:${kind}`;
+      if (autoSeedRef.current.has(stamp)) continue;
+      autoSeedRef.current.add(stamp);
+
+      const prevEntries = fixedForMonth(expenses, shiftMonth(monthKey, -1), kind);
+      if (prevEntries.length === 0 || fixedForMonth(expenses, monthKey, kind).length > 0) {
+        // Nada a semear ou mês já possui lançamentos: nunca mais tenta este mês/tipo.
+        mark(stamp);
+        continue;
+      }
+
+      const rows = prevEntries.map((e) => ({
+        ...toDbRow({
+          id: "",
+          description: e.description,
+          category: e.category,
+          kind,
+          type: "fixed",
+          amount: 0,
+          installments: null,
+          startMonth: null,
+          referenceMonth: monthKey,
+        }),
+        user_id: user.id,
+      }));
+      mark(stamp);
+      supabase
+        .from("expenses")
+        .insert(rows)
+        .select()
+        .then(({ data, error }) => {
+          if (!error && data && data.length > 0) {
+            setExpenses((prev) => [...prev, ...data.map(toExpense)]);
+          }
+        });
+    }
+  }, [user, expenses, dataLoading, dialogMonth]);
 
   const addExpense = useCallback(
     async (input: ExpenseInput) => {

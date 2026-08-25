@@ -66,7 +66,8 @@ export default function ExpenseModal({
       setKind(k);
       setType(expense.type ?? "fixed");
       setDescription(expense.description ?? "");
-      setAmountText(String(expense.amount ?? "").replace(".", ","));
+      // Lançamento semeador (valor 0): abre o campo vazio para o usuário digitar o valor real.
+      setAmountText(expense.amount ? String(expense.amount).replace(".", ",") : "");
       setInstallments(expense.installments ?? 12);
       setMonth(expense.startMonth ?? expense.referenceMonth ?? defaultMonth);
       setCategory(expense.category ?? defaultCategoryFor(k, categories));

@@ -14,6 +14,7 @@ Aplicação web responsiva (mobile-first, adaptada para desktop com navegação 
   - Item a item: ▲ aumentou / ▼ diminuiu / = igual / ★ novo no mês
   - Lista de lançamentos do mês anterior ainda não registrados
 - **Copiar mês anterior** — replica fixas ou receitas com um toque
+- **Semeadura automática do mês** — ao abrir um mês vazio, fixas e receitas do mês anterior aparecem automaticamente como **pendentes zeradas** ("informar valor"); toque, digite o valor real e pronto: a comparação item a item acontece sozinha
 - **Tela de Dashboard**
   - Resumo do ano: receitas, despesas e saldo (YTD)
   - Gráfico Receitas × Despesas dos últimos 6 meses
@@ -45,7 +46,7 @@ Acesse http://localhost:3000
 
 1. Crie um projeto em [supabase.com](https://supabase.com)
 2. No **SQL Editor**, cole e execute o conteúdo de [`supabase/schema.sql`](supabase/schema.sql) — cria as tabelas `expenses` (com receitas) e `categories` (por tipo), com Row Level Security (cada usuário só vê os próprios dados)
-3. **Projetos criados antes da v2**: execute também [`supabase/migration-002.sql`](supabase/migration-002.sql) (receitas + categorias), [`supabase/migration-003.sql`](supabase/migration-003.sql) (categorias por tipo) e [`supabase/migration-004.sql`](supabase/migration-004.sql) (despesas únicas)
+3. **Projetos criados antes da v2**: execute também [`supabase/migration-002.sql`](supabase/migration-002.sql) (receitas + categorias), [`supabase/migration-003.sql`](supabase/migration-003.sql) (categorias por tipo), [`supabase/migration-004.sql`](supabase/migration-004.sql) (despesas únicas) e [`supabase/migration-005.sql`](supabase/migration-005.sql) (valores zerados)
 4. Em **Project Settings → API**, copie:
    - `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`

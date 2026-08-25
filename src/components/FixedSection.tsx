@@ -109,12 +109,18 @@ function MonthlyEntriesSection({
                       <PencilIcon className="h-3 w-3 shrink-0 text-zinc-300 dark:text-zinc-600" />
                     </span>
                     <span className="mt-1 flex flex-wrap items-center gap-1.5">
-                      <DeltaBadge
-                        current={expense.amount}
-                        previous={change === "new" ? null : previousTotal}
-                        size="xs"
-                        invert={kind === "income"}
-                      />
+                      {expense.amount === 0 ? (
+                        <span className="rounded-full border border-dashed border-amber-400 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:border-amber-500/50 dark:text-amber-400">
+                          informar valor
+                        </span>
+                      ) : (
+                        <DeltaBadge
+                          current={expense.amount}
+                          previous={change === "new" ? null : previousTotal}
+                          size="xs"
+                          invert={kind === "income"}
+                        />
+                      )}
                     </span>
                   </span>
                   <span
@@ -122,10 +128,9 @@ function MonthlyEntriesSection({
                       kind === "income"
                         ? "text-teal-600 dark:text-teal-400"
                         : "text-zinc-900 dark:text-zinc-50"
-                    }`}
+                    } ${expense.amount === 0 ? "text-zinc-300 dark:text-zinc-600" : ""}`}
                   >
-                    {kind === "income" ? "+" : ""}
-                    {fmtBRL(expense.amount)}
+                    {expense.amount === 0 ? "—" : `${kind === "income" ? "+" : ""}${fmtBRL(expense.amount)}`}
                   </span>
                 </button>
               </li>
