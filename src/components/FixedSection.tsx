@@ -88,7 +88,7 @@ function MonthlyEntriesSection({
             const cat = lookup(expense.category);
             return (
               <li key={expense.id}>
-                <div className="flex items-center gap-2 px-2 py-1">
+                <div className="flex items-center gap-3 px-3 py-1.5">
                   <PaymentToggle expenseId={expense.id} monthKey={monthKey} />
                   <button
                     onClick={() => openEditExpense(expense)}

@@ -40,6 +40,7 @@ interface AppState {
   categories: Category[];
   error: string | null;
   addExpense: (input: ExpenseInput) => Promise<void>;
+  addExpenses: (inputs: ExpenseInput[]) => Promise<void>;
   updateExpense: (id: string, input: ExpenseInput) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
   copyFromPreviousMonth: (targetKey: string, kind: ExpenseKind) => Promise<number>;
@@ -299,6 +300,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
+  const addExpenses = useCallback(
+    async (inputs: ExpenseInput[]) => {
+      const supabase = getSupabase();
+      if (!user) throw new Error("Sessão expirada. Faça login novamente.");
+      const rows = inputs.map((input) => ({
+        ...toDbRow({ ...input, id: "" }),
+        user_id: user.id,
+      }));
+      const { data, error: err } = await supabase.from("expenses").insert(rows).select();
+      if (err) throw new Error(messageOf(err));
+      setExpenses((prev) => [...prev, ...(data ?? []).map(toExpense)]);
+    },
+    [user]
+  );
+
   const updateExpense = useCallback(async (id: string, input: ExpenseInput) => {
     const supabase = getSupabase();
     const row = toDbRow({ ...input, id });
@@ -491,6 +507,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       categories,
       error,
       addExpense,
+      addExpenses,
       updateExpense,
       deleteExpense,
       copyFromPreviousMonth,
@@ -520,6 +537,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       categories,
       error,
       addExpense,
+      addExpenses,
       updateExpense,
       deleteExpense,
       copyFromPreviousMonth,

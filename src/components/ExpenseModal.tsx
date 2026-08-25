@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { fmtBRL, parseAmount } from "@/lib/format";
-import { currentMonthKey, monthLabel } from "@/lib/months";
+import { currentMonthKey, monthLabel, shiftMonth } from "@/lib/months";
 import { fallbackCategoryFor } from "@/lib/types";
 import { useApp } from "@/context/AppContext";
 import type { ExpenseInput, ExpenseKind, ExpenseType } from "@/lib/types";
@@ -41,7 +41,7 @@ export default function ExpenseModal({
   onDelete: (id: string) => Promise<void>;
   onManageCategories: () => void;
 }) {
-  const { categories } = useApp();
+  const { categories, addExpenses } = useApp();
   const [kind, setKind] = useState<ExpenseKind>("expense");
   const [type, setType] = useState<ExpenseType>("fixed");
   /** Como o usuário informa o valor da parcelada: total da compra ou por parcela. */
@@ -51,6 +51,7 @@ export default function ExpenseModal({
   const [installments, setInstallments] = useState(12);
   const [month, setMonth] = useState(defaultMonth || currentMonthKey());
   const [category, setCategory] = useState("outros");
+  const [carryForward, setCarryForward] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -61,6 +62,7 @@ export default function ExpenseModal({
     setConfirmDelete(false);
     setBusy(false);
     setAmountMode("total");
+    setCarryForward(false);
     if (expense) {
       const k: ExpenseKind = expense.kind ?? "expense";
       setKind(k);
@@ -153,18 +155,25 @@ export default function ExpenseModal({
       ? category
       : fallbackCategoryFor(kind).key;
     const storedAmount = isInstallment && amountMode === "per" ? amount * installments : amount;
-    setBusy(true);
-    setError(null);
-    onSubmit({
+    const currentMonth = month || currentMonthKey();
+    const input: ExpenseInput = {
       description: description.trim(),
       category: validCategory,
       kind,
       type: isInstallment ? "installment" : isOnceType ? "once" : "fixed",
       amount: storedAmount,
       installments: isInstallment ? installments : null,
-      startMonth: isInstallment ? month || currentMonthKey() : null,
-      referenceMonth: month || currentMonthKey(),
-    })
+      startMonth: isInstallment ? currentMonth : null,
+      referenceMonth: currentMonth,
+    };
+    setBusy(true);
+    setError(null);
+
+    const action = carryForward && type === "fixed" && kind === "expense"
+      ? addExpenses([input, { ...input, referenceMonth: shiftMonth(currentMonth, 1) }])
+      : onSubmit(input);
+
+    action
       .then(onClose)
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : "Erro ao salvar.");
@@ -333,6 +342,27 @@ export default function ExpenseModal({
               />
             </div>
           </Field>
+
+          {type === "fixed" && kind === "expense" && (
+            <label className="flex items-center justify-between rounded-xl border border-zinc-200 px-3.5 py-2.5 dark:border-zinc-700">
+              <span className="text-sm text-zinc-700 dark:text-zinc-300">Valor fixo?</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={carryForward}
+                onClick={() => setCarryForward((v) => !v)}
+                className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
+                  carryForward ? "bg-emerald-500" : "bg-zinc-200 dark:bg-zinc-700"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                    carryForward ? "translate-x-5" : "translate-x-0.5"
+                  }`}
+                />
+              </button>
+            </label>
+          )}
 
           {isInstallmentType && (
             <Field label="Número de parcelas">

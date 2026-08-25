@@ -45,8 +45,8 @@ export default function InstallmentSection({
 
             return (
               <li key={e.id}>
-                <div className="flex items-start gap-2 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                  <div className="pt-1">
+                <div className="flex items-start gap-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+                  <div className="pt-0.5">
                     <PaymentToggle expenseId={e.id} monthKey={monthKey} />
                   </div>
                   <button
