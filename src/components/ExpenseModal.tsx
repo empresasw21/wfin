@@ -41,7 +41,7 @@ export default function ExpenseModal({
   onDelete: (id: string) => Promise<void>;
   onManageCategories: () => void;
 }) {
-  const { categories, addExpenses } = useApp();
+  const { categories, expenses, addExpenses, updateExpense } = useApp();
   const [kind, setKind] = useState<ExpenseKind>("expense");
   const [type, setType] = useState<ExpenseType>("fixed");
   /** Como o usuário informa o valor da parcelada: total da compra ou por parcela. */
@@ -71,8 +71,25 @@ export default function ExpenseModal({
       // Lançamento semeador (valor 0): abre o campo vazio para o usuário digitar o valor real.
       setAmountText(expense.amount ? String(expense.amount).replace(".", ",") : "");
       setInstallments(expense.installments ?? 12);
-      setMonth(expense.startMonth ?? expense.referenceMonth ?? defaultMonth);
+      const refMonth = expense.startMonth ?? expense.referenceMonth ?? defaultMonth;
+      setMonth(refMonth);
       setCategory(expense.category ?? defaultCategoryFor(k, categories));
+      // Detecta se já existe cópia no próximo mês (valor fixo ativo)
+      if (expense.type === "fixed" && refMonth) {
+        const nextMonth = shiftMonth(refMonth, 1);
+        const desc = (expense.description ?? "").trim().toLowerCase();
+        const cat = expense.category ?? "outros";
+        setCarryForward(
+          expenses.some(
+            (e) =>
+              e.type === "fixed" &&
+              e.kind === k &&
+              e.referenceMonth === nextMonth &&
+              e.description.trim().toLowerCase() === desc &&
+              e.category === cat
+          )
+        );
+      }
     } else {
       setKind("expense");
       setType("fixed");
@@ -169,11 +186,40 @@ export default function ExpenseModal({
     setBusy(true);
     setError(null);
 
-    const action = carryForward && type === "fixed" && kind === "expense"
-      ? addExpenses([input, { ...input, referenceMonth: shiftMonth(currentMonth, 1) }])
-      : onSubmit(input);
+    const nextMonth = shiftMonth(currentMonth, 1);
+    const nextMonthInput = { ...input, referenceMonth: nextMonth };
+    const isEditing = Boolean(expense?.id);
+    const isFixedExpense = type === "fixed";
 
-    action
+    async function run() {
+      if (isEditing) {
+        // Sempre atualiza o registro existente
+        await onSubmit(input);
+        if (carryForward && isFixedExpense) {
+          // Verifica se já existe cópia no próximo mês
+          const desc = input.description.trim().toLowerCase();
+          const existing = expenses.find(
+            (e) =>
+              e.type === "fixed" &&
+              e.kind === "expense" &&
+              e.referenceMonth === nextMonth &&
+              e.description.trim().toLowerCase() === desc &&
+              e.category === input.category
+          );
+          if (existing) {
+            await updateExpense(existing.id, nextMonthInput);
+          } else {
+            await addExpenses([nextMonthInput]);
+          }
+        }
+      } else if (carryForward && isFixedExpense) {
+        await addExpenses([input, nextMonthInput]);
+      } else {
+        await onSubmit(input);
+      }
+    }
+
+    run()
       .then(onClose)
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : "Erro ao salvar.");
@@ -343,7 +389,7 @@ export default function ExpenseModal({
             </div>
           </Field>
 
-          {type === "fixed" && kind === "expense" && (
+          {type === "fixed" && (
             <label className="flex items-center justify-between rounded-xl border border-zinc-200 px-3.5 py-2.5 dark:border-zinc-700">
               <span className="text-sm text-zinc-700 dark:text-zinc-300">Valor fixo?</span>
               <button
