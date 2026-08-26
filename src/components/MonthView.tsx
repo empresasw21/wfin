@@ -128,10 +128,10 @@ export default function MonthView({
                     prevExpenses={expenses}
                     monthKey={monthKey}
                   />
+                  <GroupSection expenses={expenses} monthKey={monthKey} />
                 </div>
               </div>
             )}
-            {activeTab === "despesas" && <GroupSection expenses={expenses} monthKey={monthKey} />}
             <MonthChart expenses={expenses} monthKey={monthKey} onSelect={onMonthChange} />
           </>
         )}
