@@ -88,13 +88,13 @@ function GroupItem({
             <input
               value={editEmoji}
               onChange={(e) => setEditEmoji(e.target.value)}
-              className="w-10 rounded-lg border border-zinc-300 bg-white px-2 py-1 text-center text-sm dark:border-zinc-700 dark:bg-zinc-800"
+              className="w-10 rounded-lg border border-zinc-300 bg-white px-2 py-1 text-center text-sm text-zinc-900 placeholder:text-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
               maxLength={2}
             />
             <input
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
-              className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-2.5 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+              className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-2.5 py-1 text-sm text-zinc-900 placeholder:text-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
               autoFocus
               onKeyDown={(e) => e.key === "Enter" && handleSaveEdit()}
             />
@@ -313,7 +313,7 @@ export default function GroupSection({
           <input
             value={newEmoji}
             onChange={(e) => setNewEmoji(e.target.value)}
-            className="w-10 rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-center text-sm dark:border-zinc-700 dark:bg-zinc-800"
+            className="w-10 rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-center text-sm text-zinc-900 placeholder:text-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
             maxLength={2}
             placeholder="📁"
           />
@@ -321,7 +321,7 @@ export default function GroupSection({
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Nome do grupo (ex.: Reforma)"
-            className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-800"
+            className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 placeholder:text-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
             autoFocus
             onKeyDown={(e) => e.key === "Enter" && handleCreate()}
           />
