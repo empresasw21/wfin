@@ -12,7 +12,7 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase";
-import { categoryToDbRow, toCategory, toDbRow, toExpense, toPayment, toPaymentDbRow } from "@/lib/db";
+import { categoryToDbRow, toCategory, toDbRow, toExpense, toExpenseGroup, toExpenseGroupDbRow, toPayment, toPaymentDbRow } from "@/lib/db";
 import { fixedForMonth } from "@/lib/calc";
 import { shiftMonth } from "@/lib/months";
 import { nextSortOrder, slugify, uniqueKey } from "@/lib/categories";
@@ -22,6 +22,8 @@ import {
   type Category,
   type CategoryInput,
   type Expense,
+  type ExpenseGroup,
+  type ExpenseGroupInput,
   type ExpenseInput,
   type ExpenseKind,
   type Payment,
@@ -38,6 +40,7 @@ interface AppState {
   payments: Payment[];
   dataLoading: boolean;
   categories: Category[];
+  groups: ExpenseGroup[];
   error: string | null;
   addExpense: (input: ExpenseInput) => Promise<void>;
   addExpenses: (inputs: ExpenseInput[]) => Promise<void>;
@@ -47,6 +50,9 @@ interface AppState {
   addCategory: (input: Omit<CategoryInput, "key" | "sortOrder">) => Promise<void>;
   updateCategory: (key: string, input: Pick<CategoryInput, "label" | "emoji">) => Promise<void>;
   deleteCategory: (key: string, kind: ExpenseKind) => Promise<void>;
+  addGroup: (input: Omit<ExpenseGroupInput, "id" | "userId" | "createdAt">) => Promise<void>;
+  updateGroup: (id: string, input: Pick<ExpenseGroupInput, "name" | "emoji">) => Promise<void>;
+  deleteGroup: (id: string) => Promise<void>;
   togglePayment: (expenseId: string, monthKey: string, paid: boolean) => Promise<void>;
   isPaid: (expenseId: string, monthKey: string) => boolean;
   signOut: () => Promise<void>;
@@ -119,6 +125,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [groups, setGroups] = useState<ExpenseGroup[]>([]);
   const [error, setError] = useState<string | null>(null);
   const userIdRef = useRef<string | null>(null);
   const seededRef = useRef<string | null>(null);
@@ -147,6 +154,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setExpenses([]);
         setPayments([]);
         setCategories([]);
+        setGroups([]);
         userIdRef.current = null;
         seededRef.current = null;
         autoSeedRef.current = new Set();
@@ -219,6 +227,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         setCategories(list);
       });
+
+    supabase
+      .from("expense_groups")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true })
+      .then(({ data, error: err }) => {
+        if (!err) setGroups((data ?? []).map(toExpenseGroup));
+      });
   }, [user]);
 
   /**
@@ -272,6 +289,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           startMonth: null,
           referenceMonth: monthKey,
           carryForward: e.carryForward,
+          groupId: null,
         }),
         user_id: user.id,
       }));
@@ -364,6 +382,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           startMonth: null,
           referenceMonth: targetKey,
           carryForward: e.carryForward,
+          groupId: null,
         }),
         user_id: user.id,
       }));
@@ -442,6 +461,59 @@ export function AppProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const addGroup = useCallback(
+    async (input: Omit<ExpenseGroupInput, "id" | "userId" | "createdAt">) => {
+      const supabase = getSupabase();
+      if (!user) throw new Error("Sessão expirada. Faça login novamente.");
+      const name = input.name.trim();
+      if (!name) throw new Error("Informe um nome para o grupo.");
+      const row = {
+        ...toExpenseGroupDbRow({ ...input, name }),
+        user_id: user.id,
+      };
+      const { data, error: err } = await supabase.from("expense_groups").insert(row).select().single();
+      if (err) throw new Error(messageOf(err));
+      setGroups((prev) => [...prev, toExpenseGroup(data)]);
+    },
+    [user]
+  );
+
+  const updateGroup = useCallback(
+    async (id: string, input: Pick<ExpenseGroupInput, "name" | "emoji">) => {
+      const supabase = getSupabase();
+      const name = input.name.trim();
+      if (!name) throw new Error("Informe um nome para o grupo.");
+      const { error: err } = await supabase
+        .from("expense_groups")
+        .update({ name, emoji: input.emoji })
+        .eq("id", id);
+      if (err) throw new Error(messageOf(err));
+      setGroups((prev) =>
+        prev.map((g) => (g.id === id ? { ...g, name, emoji: input.emoji } : g))
+      );
+    },
+    []
+  );
+
+  const deleteGroup = useCallback(
+    async (id: string) => {
+      const supabase = getSupabase();
+      // Desvincula despesas do grupo antes de excluir
+      const { error: updErr } = await supabase
+        .from("expenses")
+        .update({ group_id: null })
+        .eq("group_id", id);
+      if (updErr) throw new Error(messageOf(updErr));
+      setExpenses((prev) =>
+        prev.map((e) => (e.groupId === id ? { ...e, groupId: null } : e))
+      );
+      const { error: err } = await supabase.from("expense_groups").delete().eq("id", id);
+      if (err) throw new Error(messageOf(err));
+      setGroups((prev) => prev.filter((g) => g.id !== id));
+    },
+    []
+  );
+
   const signOut = useCallback(async () => {
     await getSupabase().auth.signOut();
   }, []);
@@ -507,6 +579,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       payments,
       dataLoading,
       categories,
+      groups,
       error,
       addExpense,
       addExpenses,
@@ -516,6 +589,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addCategory,
       updateCategory,
       deleteCategory,
+      addGroup,
+      updateGroup,
+      deleteGroup,
       togglePayment,
       isPaid,
       signOut,
@@ -537,6 +613,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       payments,
       dataLoading,
       categories,
+      groups,
       error,
       addExpense,
       addExpenses,
@@ -546,6 +623,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addCategory,
       updateCategory,
       deleteCategory,
+      addGroup,
+      updateGroup,
+      deleteGroup,
       togglePayment,
       isPaid,
       signOut,

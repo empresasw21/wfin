@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useApp } from "@/context/AppContext";
 import Header from "./Header";
 import SummaryCards from "./SummaryCards";
@@ -8,6 +8,7 @@ import { FixedSection, IncomeSection } from "./FixedSection";
 import InstallmentSection from "./InstallmentSection";
 import OnceSection from "./OnceSection";
 import MonthChart from "./MonthChart";
+import GroupSection from "./GroupSection";
 
 export default function MonthView({
   monthKey,
@@ -26,6 +27,12 @@ export default function MonthView({
   } = useApp();
   const [copyingKind, setCopyingKind] = useState<"expense" | "income" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Despesas sem grupo para as seções regulares (fixas, únicas, parceladas)
+  const ungroupedExpenses = useMemo(
+    () => expenses.filter((e) => !e.groupId),
+    [expenses]
+  );
 
   useEffect(() => {
     setDialogMonth(monthKey);
@@ -70,6 +77,8 @@ export default function MonthView({
           </div>
         ) : (
           <>
+            <GroupSection expenses={expenses} monthKey={monthKey} />
+
             <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:space-y-0">
               <div className="space-y-5">
                 <IncomeSection
@@ -79,16 +88,16 @@ export default function MonthView({
                   copying={copyingKind === "income"}
                 />
                 <FixedSection
-                  expenses={expenses}
+                  expenses={ungroupedExpenses}
                   monthKey={monthKey}
                   onCopyPrevious={() => handleCopyPrevious("expense")}
                   copying={copyingKind === "expense"}
                 />
               </div>
               <div className="mt-5 space-y-5 lg:mt-0">
-                <OnceSection expenses={expenses} monthKey={monthKey} />
+                <OnceSection expenses={ungroupedExpenses} monthKey={monthKey} />
                 <InstallmentSection
-                  expenses={expenses}
+                  expenses={ungroupedExpenses}
                   prevExpenses={expenses}
                   monthKey={monthKey}
                 />

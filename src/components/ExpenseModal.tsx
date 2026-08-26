@@ -41,7 +41,7 @@ export default function ExpenseModal({
   onDelete: (id: string) => Promise<void>;
   onManageCategories: () => void;
 }) {
-  const { categories, expenses, addExpenses, updateExpense } = useApp();
+  const { categories, expenses, groups, addExpenses, updateExpense } = useApp();
   const [kind, setKind] = useState<ExpenseKind>("expense");
   const [type, setType] = useState<ExpenseType>("fixed");
   /** Como o usuário informa o valor da parcelada: total da compra ou por parcela. */
@@ -51,6 +51,7 @@ export default function ExpenseModal({
   const [installments, setInstallments] = useState(12);
   const [month, setMonth] = useState(defaultMonth || currentMonthKey());
   const [category, setCategory] = useState("outros");
+  const [groupId, setGroupId] = useState<string | null>(null);
   const [carryForward, setCarryForward] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +74,7 @@ export default function ExpenseModal({
       const refMonth = expense.startMonth ?? expense.referenceMonth ?? defaultMonth;
       setMonth(refMonth);
       setCategory(expense.category ?? defaultCategoryFor(k, categories));
+      setGroupId(expense.groupId ?? null);
       setCarryForward(Boolean(expense.carryForward));
     } else {
       setKind("expense");
@@ -82,6 +84,7 @@ export default function ExpenseModal({
       setInstallments(12);
       setMonth(defaultMonth || currentMonthKey());
       setCategory(defaultCategoryFor("expense", categories));
+      setGroupId(null);
       setCarryForward(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -169,6 +172,7 @@ export default function ExpenseModal({
       startMonth: isInstallment ? currentMonth : null,
       referenceMonth: currentMonth,
       carryForward: isFixedExpense ? carryForward : false,
+      groupId,
     };
     setBusy(true);
     setError(null);
@@ -483,6 +487,25 @@ export default function ExpenseModal({
               Gerenciar categorias
             </button>
           </Field>
+
+          {kind === "expense" && (
+            <Field label="Grupo (opcional)">
+              <select
+                value={groupId ?? ""}
+                onChange={(e) => setGroupId(e.target.value || null)}
+                className={inputClass}
+              >
+                <option value="">Sem grupo</option>
+                {groups
+                  .filter((g) => !g.referenceMonth || g.referenceMonth === month)
+                  .map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.emoji} {g.name}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+          )}
 
           {error && (
             <p

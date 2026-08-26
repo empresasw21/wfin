@@ -1,4 +1,4 @@
-import type { Category, Expense, ExpenseType, Payment } from "./types";
+import type { Category, Expense, ExpenseGroup, ExpenseType, Payment } from "./types";
 import { monthKeyToDay } from "./months";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -18,6 +18,7 @@ export function toExpense(row: any): Expense {
     startMonth: row.start_month ? String(row.start_month).slice(0, 7) : null,
     referenceMonth: row.reference_month ? String(row.reference_month).slice(0, 7) : null,
     carryForward: Boolean(row.carry_forward),
+    groupId: row.group_id ? String(row.group_id) : null,
     createdAt: String(row.created_at ?? new Date().toISOString()),
   };
 }
@@ -37,6 +38,7 @@ export function toDbRow(expense: Omit<Expense, "userId" | "createdAt">): Record<
     start_month: isInstallment ? monthKeyToDay(expense.startMonth ?? "") : null,
     reference_month: hasReferenceMonth ? monthKeyToDay(expense.referenceMonth ?? "") : null,
     carry_forward: expense.carryForward ?? false,
+    group_id: expense.groupId ?? null,
   };
 }
 
@@ -81,5 +83,27 @@ export function categoryToDbRow(
     emoji: category.emoji,
     kind: category.kind === "income" ? "income" : "expense",
     sort_order: category.sortOrder,
+  };
+}
+
+export function toExpenseGroup(row: any): ExpenseGroup {
+  return {
+    id: String(row.id),
+    userId: String(row.user_id),
+    name: String(row.name),
+    emoji: String(row.emoji ?? "📁"),
+    referenceMonth: row.reference_month ? String(row.reference_month).slice(0, 7) : null,
+    createdAt: String(row.created_at ?? new Date().toISOString()),
+  };
+}
+
+export function toExpenseGroupDbRow(
+  group: Omit<ExpenseGroup, "id" | "userId" | "createdAt"> & { userId?: string }
+): Record<string, unknown> {
+  return {
+    ...(group.userId ? { user_id: group.userId } : {}),
+    name: group.name,
+    emoji: group.emoji,
+    reference_month: group.referenceMonth ? monthKeyToDay(group.referenceMonth) : null,
   };
 }

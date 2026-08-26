@@ -21,10 +21,23 @@ export interface Expense {
   referenceMonth: string | null;
   /** Se true, a despesa fixa/receita mantém o valor ao ser semeadada nos meses seguintes. */
   carryForward: boolean;
+  /** ID do grupo ao qual esta despesa pertence (null = sem grupo). */
+  groupId: string | null;
   createdAt: string;
 }
 
 export type ExpenseInput = Omit<Expense, "id" | "userId" | "createdAt">;
+
+export interface ExpenseGroup {
+  id: string;
+  userId: string;
+  name: string;
+  emoji: string;
+  referenceMonth: string | null;
+  createdAt: string;
+}
+
+export type ExpenseGroupInput = Omit<ExpenseGroup, "id" | "userId" | "createdAt">;
 
 export interface Payment {
   id: string;
