@@ -77,8 +77,6 @@ export default function MonthView({
           </div>
         ) : (
           <>
-            <GroupSection expenses={expenses} monthKey={monthKey} />
-
             <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:space-y-0">
               <div className="space-y-5">
                 <IncomeSection
@@ -103,6 +101,7 @@ export default function MonthView({
                 />
               </div>
             </div>
+            <GroupSection expenses={expenses} monthKey={monthKey} />
             <MonthChart expenses={expenses} monthKey={monthKey} onSelect={onMonthChange} />
           </>
         )}
