@@ -28,6 +28,25 @@ export function parseAmount(input: string): number {
   return Number.parseFloat(cleaned);
 }
 
+/** Extrai apenas dígitos de uma string formatada. */
+export function digitsOf(formatted: string): string {
+  return formatted.replace(/\D/g, "");
+}
+
+/**
+ * Formata dígitos brutos no padrão monetário brasileiro.
+ * Ex.: "1234567" → "12.345,67"
+ */
+export function formatCurrencyInput(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  const trimmed = digits.replace(/^0+/, "") || "0";
+  const intPart = trimmed.length > 2 ? trimmed.slice(0, -2) : "0";
+  const decPart = trimmed.slice(-2);
+  const withThousands = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${withThousands},${decPart}`;
+}
+
 export interface DeltaBadgeInfo {
   kind: "up" | "down" | "flat" | "new";
   /** Texto curto exibido no selo, ex.: "+R$ 25,00 · +12,5%" */

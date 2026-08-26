@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { fmtBRL, parseAmount } from "@/lib/format";
+import { digitsOf, fmtBRL, formatCurrencyInput, parseAmount } from "@/lib/format";
 import { currentMonthKey, monthLabel, shiftMonth } from "@/lib/months";
 import { fallbackCategoryFor } from "@/lib/types";
 import { useApp } from "@/context/AppContext";
@@ -69,7 +69,7 @@ export default function ExpenseModal({
       setType(expense.type ?? "fixed");
       setDescription(expense.description ?? "");
       // Lançamento semeador (valor 0): abre o campo vazio para o usuário digitar o valor real.
-      setAmountText(expense.amount ? String(expense.amount).replace(".", ",") : "");
+      setAmountText(expense.amount ? formatCurrencyInput(String(expense.amount).replace(".", "")) : "");
       setInstallments(expense.installments ?? 12);
       const refMonth = expense.startMonth ?? expense.referenceMonth ?? defaultMonth;
       setMonth(refMonth);
@@ -371,7 +371,7 @@ export default function ExpenseModal({
               </span>
               <input
                 value={amountText}
-                onChange={(e) => setAmountText(e.target.value)}
+                onChange={(e) => setAmountText(formatCurrencyInput(digitsOf(e.target.value)))}
                 inputMode="decimal"
                 placeholder="0,00"
                 className={`${inputClass} pl-10 tabular-nums`}
