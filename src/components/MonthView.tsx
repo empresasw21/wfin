@@ -27,6 +27,7 @@ export default function MonthView({
   } = useApp();
   const [copyingKind, setCopyingKind] = useState<"expense" | "income" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"receitas" | "despesas">("despesas");
 
   // Despesas sem grupo para as seções regulares (fixas, únicas, parceladas)
   const ungroupedExpenses = useMemo(
@@ -69,6 +70,30 @@ export default function MonthView({
 
         <SummaryCards expenses={expenses} payments={payments} monthKey={monthKey} />
 
+        <div className="grid grid-cols-2 gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
+          {(
+            [
+              ["receitas", "Receitas"],
+              ["despesas", "Despesas"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setActiveTab(value)}
+              className={`rounded-lg py-2 text-sm font-medium transition-colors ${
+                activeTab === value
+                  ? value === "receitas"
+                    ? "bg-teal-500 text-white shadow-sm"
+                    : "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-50"
+                  : "text-zinc-500 dark:text-zinc-400"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         {dataLoading ? (
           <div className="space-y-2" aria-busy>
             {[0, 1, 2].map((i) => (
@@ -77,31 +102,36 @@ export default function MonthView({
           </div>
         ) : (
           <>
-            <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:space-y-0">
-              <div className="space-y-5">
+            {activeTab === "receitas" ? (
+              <>
                 <IncomeSection
                   expenses={expenses}
                   monthKey={monthKey}
                   onCopyPrevious={() => handleCopyPrevious("income")}
                   copying={copyingKind === "income"}
                 />
-                <FixedSection
-                  expenses={ungroupedExpenses}
-                  monthKey={monthKey}
-                  onCopyPrevious={() => handleCopyPrevious("expense")}
-                  copying={copyingKind === "expense"}
-                />
+              </>
+            ) : (
+              <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:space-y-0">
+                <div className="space-y-5">
+                  <FixedSection
+                    expenses={ungroupedExpenses}
+                    monthKey={monthKey}
+                    onCopyPrevious={() => handleCopyPrevious("expense")}
+                    copying={copyingKind === "expense"}
+                  />
+                </div>
+                <div className="mt-5 space-y-5 lg:mt-0">
+                  <OnceSection expenses={ungroupedExpenses} monthKey={monthKey} />
+                  <InstallmentSection
+                    expenses={ungroupedExpenses}
+                    prevExpenses={expenses}
+                    monthKey={monthKey}
+                  />
+                </div>
               </div>
-              <div className="mt-5 space-y-5 lg:mt-0">
-                <OnceSection expenses={ungroupedExpenses} monthKey={monthKey} />
-                <InstallmentSection
-                  expenses={ungroupedExpenses}
-                  prevExpenses={expenses}
-                  monthKey={monthKey}
-                />
-              </div>
-            </div>
-            <GroupSection expenses={expenses} monthKey={monthKey} />
+            )}
+            {activeTab === "despesas" && <GroupSection expenses={expenses} monthKey={monthKey} />}
             <MonthChart expenses={expenses} monthKey={monthKey} onSelect={onMonthChange} />
           </>
         )}
