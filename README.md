@@ -7,6 +7,7 @@ Aplicação web responsiva (mobile-first, adaptada para desktop com navegação 
 - **Despesas fixas mensais** — contas recorrentes (aluguel, luz, internet...) por mês de referência
 - **Compras parceladas** — informe o valor total **ou o valor de cada parcela** + nº de parcelas e mês da 1ª; o app calcula o restante, progresso e término
 - **Despesas únicas** — gastos pontuais do mês (presente, reparo...) sem repetição nem comparação item a item
+- **Grupos de despesas** — agrupe lançamentos (Reforma, Viagem...) em um cartão expansível com o total do mês; o grupo acompanha os meses seguintes enquanto houver contas em aberto: as contas fixas são recriadas automaticamente junto com o grupo e o grupo some sozinho no primeiro mês em que nada dele vence
 - **Receitas e saldo** — lançamentos mensais de receita; saldo do mês = receitas − despesas, comparado ao mês anterior
 - **Categorias personalizadas por tipo** — conjuntos separados para despesas e receitas; crie, renomeie e exclua com emoji; as padrões vêm prontas
 - **Comparação com o mês anterior**
@@ -14,7 +15,7 @@ Aplicação web responsiva (mobile-first, adaptada para desktop com navegação 
   - Item a item: ▲ aumentou / ▼ diminuiu / = igual / ★ novo no mês
   - Lista de lançamentos do mês anterior ainda não registrados
 - **Copiar mês anterior** — replica fixas ou receitas com um toque
-- **Semeadura automática do mês** — ao abrir um mês vazio, fixas e receitas do mês anterior aparecem automaticamente como **pendentes zeradas** ("informar valor"); toque, digite o valor real e pronto: a comparação item a item acontece sozinha
+- **Semeadura automática do mês** — ao abrir um mês vazio, fixas e receitas do mês anterior aparecem automaticamente como **pendentes zeradas** ("informar valor"); toque, digite o valor real e pronto: a comparação item a item acontece sozinha. A semeadura é feita por grupo (cada grupo e as contas soltas seguem separadamente) e usa o mês anterior mais recente que tenha lançamentos, então também funciona ao pular vários meses
 - **Tela de Dashboard**
   - Resumo do ano: receitas, despesas e saldo (YTD)
   - Gráfico Receitas × Despesas dos últimos 6 meses

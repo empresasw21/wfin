@@ -48,7 +48,7 @@ export default function BottomNav() {
           );
         })}
         <button
-          onClick={openNewExpense}
+          onClick={() => openNewExpense()}
           aria-label="Adicionar lançamento"
           className="absolute left-1/2 top-0 flex h-14 w-14 -translate-x-1/2 -translate-y-5 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 ring-4 ring-white transition-transform hover:scale-105 active:scale-95 dark:ring-zinc-950"
         >

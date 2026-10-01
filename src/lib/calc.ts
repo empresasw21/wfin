@@ -1,4 +1,4 @@
-import type { Expense, ExpenseKind, Payment } from "./types";
+import type { Expense, ExpenseGroup, ExpenseKind, Payment } from "./types";
 import { installmentStatus, shiftMonth } from "./months";
 
 export interface MonthStats {
@@ -80,6 +80,90 @@ export function onceForMonth(expenses: Expense[], key: string): Expense[] {
   return expenses
     .filter((e) => e.kind === "expense" && e.type === "once" && e.referenceMonth === key)
     .sort((a, b) => b.amount - a.amount || a.description.localeCompare(b.description, "pt-BR"));
+}
+
+/**
+ * O lançamento pertence a este mês? Fixas e únicas pelo mês de referência,
+ * parceladas enquanto houver parcela ativa. Não depende do valor (semeaduras
+ * com valor 0 continuam contando).
+ */
+export function expenseAppliesInMonth(expense: Expense, key: string): boolean {
+  if (expense.kind !== "expense") return false;
+  if (expense.type === "installment") return installmentStatus(expense, key).active;
+  return expense.referenceMonth === key;
+}
+
+/**
+ * Grupos visíveis em um mês: o grupo precisa já existir (referenceMonth é o mês
+ * de criação) e ter ao menos um lançamento que vence no mês. Assim o grupo é
+ * mantido nos meses seguintes enquanto houver contas em aberto e some sozinho
+ * quando nada mais vence.
+ */
+export function groupsForMonth(
+  groups: ExpenseGroup[],
+  expenses: Expense[],
+  key: string
+): ExpenseGroup[] {
+  return groups.filter((g) => {
+    if (!g.referenceMonth) return true;
+    if (g.referenceMonth > key) return false;
+    return expenses.some((e) => e.groupId === g.id && expenseAppliesInMonth(e, key));
+  });
+}
+
+/** Identidade de uma fixa entre meses (descrição + categoria + grupo). */
+export function fixedEntryKey(expense: Expense): string {
+  return `${normalize(expense.description)}::${expense.category}::${expense.groupId ?? ""}`;
+}
+
+/**
+ * Fixas de um mês dentro de um bucket: `groupId` nulo = sem grupo. Usado para
+ * semear cada grupo (e o conjunto solto) de forma independente.
+ */
+export function fixedInGroup(
+  expenses: Expense[],
+  key: string,
+  groupId: string | null,
+  kind: ExpenseKind = "expense"
+): Expense[] {
+  return fixedForMonth(expenses, key, kind).filter((e) => (e.groupId ?? null) === groupId);
+}
+
+function nearestPreviousMonth(
+  pick: (monthKey: string) => Expense[],
+  key: string,
+  maxLookback: number
+): { monthKey: string; entries: Expense[] } | null {
+  for (let back = 1; back <= maxLookback; back += 1) {
+    const candidate = shiftMonth(key, -back);
+    const entries = pick(candidate);
+    if (entries.length > 0) return { monthKey: candidate, entries };
+  }
+  return null;
+}
+
+/**
+ * Mês anterior mais próximo que tenha fixas no bucket informado, olhando até
+ * `maxLookback` meses para trás. Permite propagar ao pular vários meses.
+ */
+export function previousMonthWithFixed(
+  expenses: Expense[],
+  key: string,
+  groupId: string | null,
+  kind: ExpenseKind = "expense",
+  maxLookback = 12
+): { monthKey: string; entries: Expense[] } | null {
+  return nearestPreviousMonth((k) => fixedInGroup(expenses, k, groupId, kind), key, maxLookback);
+}
+
+/** Mês anterior mais próximo que tenha fixas, de qualquer grupo. */
+export function previousMonthWithAnyFixed(
+  expenses: Expense[],
+  key: string,
+  kind: ExpenseKind = "expense",
+  maxLookback = 12
+): { monthKey: string; entries: Expense[] } | null {
+  return nearestPreviousMonth((k) => fixedForMonth(expenses, k, kind), key, maxLookback);
 }
 
 export function statsForMonth(expenses: Expense[], key: string, payments: Payment[] = []): MonthStats {

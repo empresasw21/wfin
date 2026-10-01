@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { fmtBRL } from "@/lib/format";
-import { monthlyValue } from "@/lib/calc";
+import { expenseAppliesInMonth, groupsForMonth, monthlyValue } from "@/lib/calc";
 import { categoryOf } from "@/lib/categories";
 import { installmentStatus } from "@/lib/months";
 import { useApp } from "@/context/AppContext";
@@ -38,8 +38,9 @@ function GroupItem({
   const [busy, setBusy] = useState(false);
 
   const total = groupTotal(expenses, group, monthKey);
+  // Só as contas que vencem/estão ativas neste mês (o grupo já é filtrado por mês).
   const children = expenses
-    .filter((e) => e.groupId === group.id && e.kind === "expense")
+    .filter((e) => e.groupId === group.id && expenseAppliesInMonth(e, monthKey))
     .sort((a, b) => a.description.localeCompare(b.description, "pt-BR"));
 
   const handleSaveEdit = useCallback(async () => {
@@ -67,8 +68,8 @@ function GroupItem({
   }, [group.id, confirmDelete, deleteGroup]);
 
   const handleAddChild = useCallback(() => {
-    openNewExpense();
-  }, [openNewExpense]);
+    openNewExpense(group.id);
+  }, [group.id, openNewExpense]);
 
   return (
     <li className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
@@ -258,7 +259,7 @@ export default function GroupSection({
   const [newEmoji, setNewEmoji] = useState("📁");
   const [busy, setBusy] = useState(false);
 
-  const monthGroups = groups.filter((g) => !g.referenceMonth || g.referenceMonth === monthKey);
+  const monthGroups = groupsForMonth(groups, expenses, monthKey);
   const total = monthGroups.reduce((acc, g) => acc + groupTotal(expenses, g, monthKey), 0);
 
   const handleCreate = useCallback(async () => {

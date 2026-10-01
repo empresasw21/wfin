@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { digitsOf, fmtBRL, formatCurrencyInput, parseAmount } from "@/lib/format";
+import { groupsForMonth } from "@/lib/calc";
 import { currentMonthKey, monthLabel, shiftMonth } from "@/lib/months";
 import { fallbackCategoryFor } from "@/lib/types";
 import { useApp } from "@/context/AppContext";
@@ -28,6 +29,7 @@ export default function ExpenseModal({
   open,
   expense,
   defaultMonth,
+  defaultGroupId,
   onClose,
   onSubmit,
   onDelete,
@@ -36,6 +38,8 @@ export default function ExpenseModal({
   open: boolean;
   expense: ExpenseInput & { id?: string } | null;
   defaultMonth: string;
+  /** Grupo pré-selecionado ao criar (ex.: "Adicionar despesa" dentro do grupo). */
+  defaultGroupId?: string | null;
   onClose: () => void;
   onSubmit: (input: ExpenseInput) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
@@ -84,11 +88,11 @@ export default function ExpenseModal({
       setInstallments(12);
       setMonth(defaultMonth || currentMonthKey());
       setCategory(defaultCategoryFor("expense", categories));
-      setGroupId(null);
+      setGroupId(defaultGroupId ?? null);
       setCarryForward(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, expense, defaultMonth]);
+  }, [open, expense, defaultMonth, defaultGroupId]);
 
   if (!open) return null;
 
@@ -186,7 +190,7 @@ export default function ExpenseModal({
         // Sempre atualiza o registro existente
         await onSubmit(input);
         if (carryForward && isFixedExpense) {
-          // Verifica se já existe cópia no próximo mês
+          // Verifica se já existe cópia no próximo mês (mesma conta e mesmo grupo)
           const desc = input.description.trim().toLowerCase();
           const existing = expenses.find(
             (e) =>
@@ -194,7 +198,8 @@ export default function ExpenseModal({
               e.kind === kind &&
               e.referenceMonth === nextMonth &&
               e.description.trim().toLowerCase() === desc &&
-              e.category === input.category
+              e.category === input.category &&
+              (e.groupId ?? null) === (groupId ?? null)
           );
           if (existing) {
             await updateExpense(existing.id, nextMonthInput);
@@ -496,13 +501,11 @@ export default function ExpenseModal({
                 className={inputClass}
               >
                 <option value="">Sem grupo</option>
-                {groups
-                  .filter((g) => !g.referenceMonth || g.referenceMonth === month)
-                  .map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.emoji} {g.name}
-                    </option>
-                  ))}
+                {groupsForMonth(groups, expenses, month).map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.emoji} {g.name}
+                  </option>
+                ))}
               </select>
             </Field>
           )}

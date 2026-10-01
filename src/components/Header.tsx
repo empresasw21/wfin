@@ -77,7 +77,7 @@ export default function Header({
         </nav>
         <div className="flex items-center gap-1">
           <button
-            onClick={openNewExpense}
+            onClick={() => openNewExpense()}
             className="mr-1 hidden h-9 items-center gap-1.5 rounded-xl bg-emerald-500 px-3.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 lg:inline-flex"
           >
             <PlusIcon className="h-4 w-4" />

@@ -13,8 +13,13 @@ import {
 import type { Session, User } from "@supabase/supabase-js";
 import { getSupabase, supabaseConfigured } from "@/lib/supabase";
 import { categoryToDbRow, toCategory, toDbRow, toExpense, toExpenseGroup, toExpenseGroupDbRow, toPayment, toPaymentDbRow } from "@/lib/db";
-import { fixedForMonth } from "@/lib/calc";
-import { shiftMonth } from "@/lib/months";
+import {
+  fixedEntryKey,
+  fixedForMonth,
+  fixedInGroup,
+  previousMonthWithAnyFixed,
+  previousMonthWithFixed,
+} from "@/lib/calc";
 import { nextSortOrder, slugify, uniqueKey } from "@/lib/categories";
 import {
   defaultCategoriesFor,
@@ -59,7 +64,7 @@ interface AppState {
   // Diálogos globais
   dialogMonth: string;
   setDialogMonth: (key: string) => void;
-  openNewExpense: () => void;
+  openNewExpense: (groupId?: string | null) => void;
   openEditExpense: (expense: Expense) => void;
   closeExpenseDialog: () => void;
   expenseDialogOpen: boolean;
@@ -133,6 +138,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [newExpenseGroupId, setNewExpenseGroupId] = useState<string | null>(null);
   const [dialogMonth, setDialogMonth] = useState("");
   const [categoriesOpen, setCategoriesOpen] = useState(false);
 
@@ -239,10 +245,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   /**
-   * Semeadura automática de fixas/receitas zeradas: ao abrir um mês ainda
-   * vazio daquele tipo, replica os lançamentos do mês anterior com amount 0
-   * para o usuário preencher. Marca cada (usuário, mês, tipo) uma única vez
-   * (ref + localStorage) — exclusões manuais são respeitadas depois.
+   * Semeadura automática de fixas/receitas zeradas: ao abrir um mês, replica os
+   * lançamentos do mês anterior com amount 0 para o usuário preencher. O
+   * repasse é feito por bucket (cada grupo e o conjunto sem grupo), então uma
+   * fixa dentro de um grupo é recriada junto com o grupo no mês seguinte.
+   * A origem é o mês anterior mais próximo com lançamentos daquele bucket
+   * (até 12 meses atrás), permitindo pular vários meses. Marca cada
+   * (usuário, mês, tipo, bucket) uma única vez (ref + localStorage) — exclusões
+   * manuais são respeitadas depois.
    */
   useEffect(() => {
     if (!supabaseConfigured || !user || dataLoading || !dialogMonth) return;
@@ -265,46 +275,56 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch {}
     };
 
+    // Buckets: sem grupo + um por grupo (income nunca usa grupo, mas o filtro
+    // abaixo garante que receitas agrupadas indevidas não sejam semeadas).
+    const buckets: Array<string | null> = [null, ...groups.map((g) => g.id)];
+
     for (const kind of ["expense", "income"] as ExpenseKind[]) {
-      const stamp = `${user.id}:${monthKey}:${kind}`;
-      if (autoSeedRef.current.has(stamp)) continue;
-      autoSeedRef.current.add(stamp);
+      for (const groupId of buckets) {
+        const bucket = groupId ?? "none";
+        const stamp = `${user.id}:${monthKey}:${kind}:${bucket}`;
+        if (autoSeedRef.current.has(stamp)) continue;
+        autoSeedRef.current.add(stamp);
 
-      const prevEntries = fixedForMonth(expenses, shiftMonth(monthKey, -1), kind);
-      if (prevEntries.length === 0 || fixedForMonth(expenses, monthKey, kind).length > 0) {
-        // Nada a semear ou mês já possui lançamentos: nunca mais tenta este mês/tipo.
+        const source = previousMonthWithFixed(expenses, monthKey, groupId, kind);
+        if (
+          !source ||
+          fixedInGroup(expenses, monthKey, groupId, kind).length > 0
+        ) {
+          // Nada a semear ou o bucket já possui lançamentos: nunca mais tenta.
+          mark(stamp);
+          continue;
+        }
+
+        const rows = source.entries.map((e) => ({
+          ...toDbRow({
+            id: "",
+            description: e.description,
+            category: e.category,
+            kind,
+            type: "fixed",
+            amount: e.carryForward ? e.amount : 0,
+            installments: null,
+            startMonth: null,
+            referenceMonth: monthKey,
+            carryForward: e.carryForward,
+            groupId,
+          }),
+          user_id: user.id,
+        }));
         mark(stamp);
-        continue;
+        supabase
+          .from("expenses")
+          .insert(rows)
+          .select()
+          .then(({ data, error }) => {
+            if (!error && data && data.length > 0) {
+              setExpenses((prev) => [...prev, ...data.map(toExpense)]);
+            }
+          });
       }
-
-      const rows = prevEntries.map((e) => ({
-        ...toDbRow({
-          id: "",
-          description: e.description,
-          category: e.category,
-          kind,
-          type: "fixed",
-          amount: e.carryForward ? e.amount : 0,
-          installments: null,
-          startMonth: null,
-          referenceMonth: monthKey,
-          carryForward: e.carryForward,
-          groupId: null,
-        }),
-        user_id: user.id,
-      }));
-      mark(stamp);
-      supabase
-        .from("expenses")
-        .insert(rows)
-        .select()
-        .then(({ data, error }) => {
-          if (!error && data && data.length > 0) {
-            setExpenses((prev) => [...prev, ...data.map(toExpense)]);
-          }
-        });
     }
-  }, [user, expenses, dataLoading, dialogMonth]);
+  }, [user, expenses, groups, dataLoading, dialogMonth]);
 
   const addExpense = useCallback(
     async (input: ExpenseInput) => {
@@ -355,20 +375,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setExpenses((prev) => prev.filter((e) => e.id !== id));
   }, []);
 
+  /**
+   * Copia as fixas do mês anterior mais próximo que tenha lançamentos para o mês
+   * alvo, preservando o grupo de cada uma (bucket próprio por grupo). Ignora o
+   * que já existe no alvo (descrição + categoria + grupo).
+   */
   const copyFromPreviousMonth = useCallback(
     async (targetKey: string, kind: ExpenseKind): Promise<number> => {
       const supabase = getSupabase();
       if (!user) throw new Error("Sessão expirada. Faça login novamente.");
-      const prevKey = shiftMonth(targetKey, -1);
-      const prevEntries = fixedForMonth(expenses, prevKey, kind);
+      const source = previousMonthWithAnyFixed(expenses, targetKey, kind);
+      if (!source) return 0;
       const existing = new Set(
-        fixedForMonth(expenses, targetKey, kind).map(
-          (e) => `${e.description.trim().toLowerCase()}::${e.category}`
-        )
+        fixedForMonth(expenses, targetKey, kind).map(fixedEntryKey)
       );
-      const missing = prevEntries.filter(
-        (e) => !existing.has(`${e.description.trim().toLowerCase()}::${e.category}`)
-      );
+      const missing = source.entries.filter((e) => !existing.has(fixedEntryKey(e)));
       if (missing.length === 0) return 0;
       const rows = missing.map((e) => ({
         ...toDbRow({
@@ -382,7 +403,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           startMonth: null,
           referenceMonth: targetKey,
           carryForward: e.carryForward,
-          groupId: null,
+          groupId: e.groupId,
         }),
         user_id: user.id,
       }));
@@ -557,8 +578,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [payments]
   );
 
-  const openNewExpense = useCallback(() => {
+  const openNewExpense = useCallback((groupId?: string | null) => {
     setEditingExpense(null);
+    setNewExpenseGroupId(groupId ?? null);
     setExpenseDialogOpen(true);
   }, []);
 
@@ -648,6 +670,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         open={expenseDialogOpen}
         expense={editingExpense}
         defaultMonth={dialogMonth}
+        defaultGroupId={editingExpense ? null : newExpenseGroupId}
         onClose={closeExpenseDialog}
         onSubmit={editingExpense ? updateExpense.bind(null, editingExpense.id) : addExpense}
         onDelete={deleteExpense}
