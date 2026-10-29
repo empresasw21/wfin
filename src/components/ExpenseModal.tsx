@@ -73,7 +73,9 @@ export default function ExpenseModal({
       setType(expense.type ?? "fixed");
       setDescription(expense.description ?? "");
       // Lançamento semeador (valor 0): abre o campo vazio para o usuário digitar o valor real.
-      setAmountText(expense.amount ? formatCurrencyInput(String(expense.amount).replace(".", "")) : "");
+      setAmountText(
+        expense.amount ? formatCurrencyInput(String(Math.round(expense.amount * 100))) : ""
+      );
       setInstallments(expense.installments ?? 12);
       const refMonth = expense.startMonth ?? expense.referenceMonth ?? defaultMonth;
       setMonth(refMonth);
